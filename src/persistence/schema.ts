@@ -16,6 +16,10 @@ export const SettingsSchemaV1 = z.object({
   beloteEnabled: z.boolean(),
   /** Disposition des cartes du pli : en croix géographique (défaut) ou en ligne. */
   trickLayout: z.enum(['cross', 'inline']).default('cross'),
+  /** Joue automatiquement la carte humaine quand il n'en reste qu'une légale. */
+  autoPlayLastCard: z.boolean().default(true),
+  /** Lance automatiquement la donne suivante quand la précédente se termine. */
+  autoNextDeal: z.boolean().default(true),
 });
 
 export type Settings = z.infer<typeof SettingsSchemaV1>;
@@ -30,4 +34,6 @@ export const DEFAULT_SETTINGS_V1: Settings = {
   targetDeals: 4,
   beloteEnabled: true,
   trickLayout: 'cross',
+  autoPlayLastCard: true,
+  autoNextDeal: true,
 };

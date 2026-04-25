@@ -125,6 +125,30 @@
     </section>
 
     <section>
+      <h3>Confort</h3>
+      <div class="layout-choice">
+        <label>
+          <input
+            type="checkbox"
+            checked={settingsStore.value.autoPlayLastCard}
+            onchange={(e) =>
+              settingsStore.set((c) => ({ ...c, autoPlayLastCard: e.currentTarget.checked }))}
+          />
+          Jouer automatiquement la dernière carte forcée
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={settingsStore.value.autoNextDeal}
+            onchange={(e) =>
+              settingsStore.set((c) => ({ ...c, autoNextDeal: e.currentTarget.checked }))}
+          />
+          Lancer automatiquement la donne suivante
+        </label>
+      </div>
+    </section>
+
+    <section>
       <h3>Disposition du pli</h3>
       <div class="layout-choice">
         <label>

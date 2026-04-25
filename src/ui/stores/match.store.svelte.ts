@@ -3,6 +3,7 @@
 import type { Bid, Card, DealResult, DealState, MatchState, Seat, Trick } from '@core/types';
 import { createMatch, applyDealResult } from '@core/match';
 import { startDeal } from '@core/game-state';
+import { legalMoves } from '@core/rules/legal-moves';
 import { createRng, randomSeed } from '@core/rng';
 import type { AIConfig, AIPlayer } from '@ai/types';
 import { createAI } from '@ai/registry';
@@ -99,12 +100,41 @@ function makeStore() {
         }),
       onAwaitHuman: (seat) => {
         state.awaitingHuman = seat;
+        // Auto-joue la carte si une seule carte légale et option activée.
+        if (
+          settingsStore.value.autoPlayLastCard &&
+          state.deal.phase.kind === 'playing'
+        ) {
+          const playing = state.deal.phase;
+          const legal = legalMoves(state.deal.hands[seat], playing.current, playing.trump, seat);
+          if (legal.length === 1) {
+            const card = legal[0]!;
+            // petit délai pour permettre à l'UI de "voir" le tour arriver
+            setTimeout(() => {
+              if (orch && state.awaitingHuman === seat) {
+                state.awaitingHuman = null;
+                try {
+                  orch.submitHumanAction({ type: 'play', seat, card });
+                } catch {
+                  /* déjà traité */
+                }
+              }
+            }, 120);
+          }
+        }
       },
       onDealEnd: (final) => {
         state.awaitingHuman = null;
         if (final.phase.kind === 'scored') {
           const result: DealResult = final.phase.result;
           state.match = applyDealResult(state.match, result);
+          if (settingsStore.value.autoNextDeal && !state.match.finished) {
+            // laisse voir le résultat un instant proportionnel à la cadence
+            const ms = Math.min(4000, Math.max(1500, settingsStore.value.paceMs));
+            setTimeout(() => {
+              if (!state.match.finished) nextDeal();
+            }, ms);
+          }
         }
       },
       onRedeal: () => {
