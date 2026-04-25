@@ -1,73 +1,110 @@
-// Alpha-beta sur monde à information complète.
-// Évalue la donne restante en supposant que tous les joueurs jouent rationnellement.
-// Retourne l'espérance de score pour l'équipe de l'IA (ownTeam).
+// Alpha-beta véritable sur monde à information complète.
+// Maximise les points de l'équipe `ownTeam` à la fin de la donne.
+// - Vraies coupures alpha/beta propagées (pas min-max).
+// - Transposition table par état (hands restantes encodées en bitmask).
+// - Move ordering pour maximiser les coupures.
 
 import type { Card, Hands, PlayedCard, Seat, Suit, Trick } from '@core/types';
 import { SEAT_TEAM, nextSeat, sameCard } from '@core/types';
 import { legalMoves } from '@core/rules/legal-moves';
 import { masterIndex, masterSeat } from '@core/rules/trick';
 import { cardPoints, cardStrength } from '@core/rules/ordering';
-import { DIX_DE_DER } from '@core/rules/constants';
+import { DIX_DE_DER, TOTAL_DEAL_POINTS } from '@core/rules/constants';
 
 export interface SolverState {
   hands: Hands;
   currentTrick: Trick;
   trump: Suit;
-  takerTeam: 'NS' | 'EW';
-  /** Points cumulés pour chaque équipe (cartes des plis remportés jusqu'ici). */
   pointsNS: number;
   pointsEW: number;
-  tricksRemaining: number;
+  tricksRemaining: number; // plis encore à jouer (incluant le pli courant)
 }
 
 export interface SolverResult {
-  /** Score net du point de vue de l'équipe ownTeam à la fin de la donne (cartes seulement). */
+  /** Points cartes finaux pour l'équipe ownTeam (0..162). */
   scoreOwn: number;
   bestCard: Card | null;
 }
 
-export function solve(state: SolverState, ownSeat: Seat, deadline: number, depth = 0): SolverResult {
-  const ownTeam = SEAT_TEAM[ownSeat];
+interface Ctx {
+  ownSeat: Seat;
+  ownTeam: 'NS' | 'EW';
+  deadline: number;
+  trans: Map<string, number>;
+  nodes: number;
+}
 
-  // Cas terminal : plus de cartes.
-  if (state.tricksRemaining === 0 && state.currentTrick.cards.length === 0) {
-    const own = ownTeam === 'NS' ? state.pointsNS : state.pointsEW;
-    return { scoreOwn: own, bestCard: null };
+export function solve(state: SolverState, ownSeat: Seat, deadline: number): SolverResult {
+  const ctx: Ctx = {
+    ownSeat,
+    ownTeam: SEAT_TEAM[ownSeat],
+    deadline,
+    trans: new Map(),
+    nodes: 0,
+  };
+  const { score, card } = alphabeta(state, -Infinity, Infinity, ctx);
+  return { scoreOwn: score, bestCard: card };
+}
+
+function alphabeta(
+  state: SolverState,
+  alpha: number,
+  beta: number,
+  ctx: Ctx,
+): { score: number; card: Card | null } {
+  ctx.nodes++;
+
+  const totalCardsLeft = state.hands.N.length + state.hands.E.length + state.hands.S.length + state.hands.W.length;
+  if (totalCardsLeft === 0) {
+    const own = ctx.ownTeam === 'NS' ? state.pointsNS : state.pointsEW;
+    return { score: own, card: null };
   }
 
-  // Budget temps.
-  if (Date.now() > deadline) {
-    return { scoreOwn: heuristicEval(state, ownTeam), bestCard: null };
+  // Budget temps : si dépassé, on retombe sur une heuristique plus fine que 50/50.
+  if ((ctx.nodes & 1023) === 0 && Date.now() > ctx.deadline) {
+    return { score: heuristicEval(state, ctx.ownTeam), card: null };
   }
 
-  // Détermine le siège qui doit jouer.
+  // Transposition table — uniquement quand le pli courant est vide (état "propre").
+  let key: string | null = null;
+  if (state.currentTrick.cards.length === 0) {
+    key = encodeKey(state, ctx.ownSeat);
+    const cached = ctx.trans.get(key);
+    if (cached !== undefined) return { score: cached, card: null };
+  }
+
   const seat = expectedSeat(state.currentTrick);
-  const hand = state.hands[seat];
-  const moves = legalMoves(hand, state.currentTrick, state.trump, seat);
+  const isMaximizing = SEAT_TEAM[seat] === ctx.ownTeam;
+  const moves = orderMoves(legalMoves(state.hands[seat], state.currentTrick, state.trump, seat), state, isMaximizing);
 
-  const isMaximizing = SEAT_TEAM[seat] === ownTeam;
-  let best: SolverResult = isMaximizing
-    ? { scoreOwn: -Infinity, bestCard: null }
-    : { scoreOwn: Infinity, bestCard: null };
+  let bestCard: Card | null = moves[0] ?? null;
+  let bestScore = isMaximizing ? -Infinity : Infinity;
 
-  // Move ordering : essaie en premier les coups les plus prometteurs (atouts forts, basses cartes).
-  const ordered = orderMoves(moves, state, seat);
-
-  for (const card of ordered) {
+  for (const card of moves) {
     const next = applyMove(state, seat, card);
-    const r = solve(next, ownSeat, deadline, depth + 1);
+    const r = alphabeta(next, alpha, beta, ctx);
     if (isMaximizing) {
-      if (r.scoreOwn > best.scoreOwn) best = { scoreOwn: r.scoreOwn, bestCard: card };
+      if (r.score > bestScore) {
+        bestScore = r.score;
+        bestCard = card;
+      }
+      if (bestScore > alpha) alpha = bestScore;
     } else {
-      if (r.scoreOwn < best.scoreOwn) best = { scoreOwn: r.scoreOwn, bestCard: card };
+      if (r.score < bestScore) {
+        bestScore = r.score;
+        bestCard = card;
+      }
+      if (bestScore < beta) beta = bestScore;
     }
-    if (Date.now() > deadline) break;
+    if (alpha >= beta) break; // coupure
+    if (Date.now() > ctx.deadline) break;
   }
 
-  if (!isFinite(best.scoreOwn)) {
-    return { scoreOwn: heuristicEval(state, ownTeam), bestCard: ordered[0] ?? null };
+  if (!isFinite(bestScore)) {
+    bestScore = heuristicEval(state, ctx.ownTeam);
   }
-  return best;
+  if (key !== null) ctx.trans.set(key, bestScore);
+  return { score: bestScore, card: bestCard };
 }
 
 function expectedSeat(trick: Trick): Seat {
@@ -86,7 +123,6 @@ function applyMove(state: SolverState, seat: Seat, card: Card): SolverState {
       currentTrick: { leader: state.currentTrick.leader, cards: newCards },
     };
   }
-  // Pli complet : résoudre.
   const trick: Trick = { leader: state.currentTrick.leader, cards: newCards };
   const winnerIdx = masterIndex(trick, state.trump);
   const winner = newCards[winnerIdx]!.seat;
@@ -99,39 +135,90 @@ function applyMove(state: SolverState, seat: Seat, card: Card): SolverState {
     hands: newHands,
     currentTrick: { leader: winner, cards: [] },
     trump: state.trump,
-    takerTeam: state.takerTeam,
     pointsNS: state.pointsNS + (team === 'NS' ? pts : 0),
     pointsEW: state.pointsEW + (team === 'EW' ? pts : 0),
     tricksRemaining: state.tricksRemaining - 1,
   };
 }
 
-function orderMoves(moves: readonly Card[], state: SolverState, seat: Seat): Card[] {
-  // Heuristique : si on entame, essayer cartes fortes en premier.
-  // Si on doit fournir, essayer la plus basse qui gagne d'abord.
+function orderMoves(moves: readonly Card[], state: SolverState, isMaximizing: boolean): Card[] {
+  // En max : essaye les coups les plus payants d'abord (+pts, +force atout).
+  // En min : on inverse pour favoriser les coupures côté adverse.
   const trick = state.currentTrick;
+  const sorted = moves.slice();
+
   if (trick.cards.length === 0) {
-    return moves.slice().sort((a, b) => cardStrength(b, state.trump) - cardStrength(a, state.trump));
+    sorted.sort((a, b) => cardStrength(b, state.trump) - cardStrength(a, state.trump));
+  } else {
+    const partnerSeat = partner(expectedSeat(trick));
+    const pMaster = masterSeat(trick, state.trump) === partnerSeat;
+    if (pMaster) {
+      // Donner gros (max) ou éviter (min).
+      sorted.sort((a, b) => cardPoints(b, state.trump) - cardPoints(a, state.trump));
+    } else {
+      sorted.sort((a, b) => cardStrength(b, state.trump) - cardStrength(a, state.trump));
+    }
   }
-  const partnerMaster = (() => {
-    return masterSeat(trick, state.trump) === partner(seat);
-  })();
-  if (partnerMaster) {
-    // Essaie les cartes les plus précieuses d'abord (donne points).
-    return moves.slice().sort((a, b) => cardPoints(b, state.trump) - cardPoints(a, state.trump));
-  }
-  // Sinon : essaie cartes hautes d'abord (peut gagner).
-  return moves.slice().sort((a, b) => cardStrength(b, state.trump) - cardStrength(a, state.trump));
+  if (!isMaximizing) sorted.reverse();
+  return sorted;
 }
 
 function partner(s: Seat): Seat {
   return s === 'N' ? 'S' : s === 'S' ? 'N' : s === 'E' ? 'W' : 'E';
 }
 
+/** Encodage déterministe pour la table de transposition.
+ *  Dépend uniquement de : cartes restantes par siège (triées) + atout + leader courant + ownSeat. */
+function encodeKey(state: SolverState, ownSeat: Seat): string {
+  const enc = (cards: readonly Card[]): string =>
+    cards
+      .map((c) => `${c.rank}${c.suit}`)
+      .sort()
+      .join(',');
+  return [
+    state.trump,
+    state.currentTrick.leader,
+    ownSeat,
+    enc(state.hands.N),
+    enc(state.hands.E),
+    enc(state.hands.S),
+    enc(state.hands.W),
+  ].join('|');
+}
+
+/** Heuristique d'éval à la coupure : points actuels + estimation des points restants
+ *  pondérée par force des atouts en main de chaque équipe. */
 function heuristicEval(state: SolverState, ownTeam: 'NS' | 'EW'): number {
-  // Estimation rapide : points actuels + part proportionnelle des points restants.
-  const remainingPoints = 152 - state.pointsNS - state.pointsEW + DIX_DE_DER;
   const own = ownTeam === 'NS' ? state.pointsNS : state.pointsEW;
-  // 50% par défaut.
-  return own + remainingPoints * 0.5;
+  const remainingCards: Card[] = [
+    ...state.hands.N,
+    ...state.hands.E,
+    ...state.hands.S,
+    ...state.hands.W,
+  ];
+  let remainingPts = state.tricksRemaining > 0 ? DIX_DE_DER : 0;
+  for (const c of remainingCards) remainingPts += cardPoints(c, state.trump);
+
+  // Estime la part de l'équipe own : ratio (force atouts own / total force atouts).
+  const ownSeats: Seat[] = ownTeam === 'NS' ? ['N', 'S'] : ['E', 'W'];
+  const oppSeats: Seat[] = ownTeam === 'NS' ? ['E', 'W'] : ['N', 'S'];
+  let ownTrumpStrength = 0;
+  let oppTrumpStrength = 0;
+  for (const s of ownSeats) {
+    for (const c of state.hands[s]) {
+      if (c.suit === state.trump) ownTrumpStrength += cardStrength(c, state.trump) + 1;
+    }
+  }
+  for (const s of oppSeats) {
+    for (const c of state.hands[s]) {
+      if (c.suit === state.trump) oppTrumpStrength += cardStrength(c, state.trump) + 1;
+    }
+  }
+  const totalTrump = ownTrumpStrength + oppTrumpStrength;
+  const ratio = totalTrump > 0 ? ownTrumpStrength / totalTrump : 0.5;
+  // Lissage vers 0.5 : on n'extrapole pas trop.
+  const blended = 0.4 + 0.2 * (ratio - 0.5) * 2; // entre ~0.3 et ~0.5
+  const estim = own + remainingPts * blended;
+  // Borne supérieure : on ne peut jamais dépasser 162 points cartes.
+  return Math.min(estim, TOTAL_DEAL_POINTS);
 }
