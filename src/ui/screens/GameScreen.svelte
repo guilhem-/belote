@@ -4,15 +4,14 @@
   import Scoreboard from '../components/Scoreboard.svelte';
   import type { Bid, Card, Seat } from '@core/types';
 
-  // En étape C : tous les sièges sont humains (pour valider les règles).
-  const humanSeats: Seat[] = ['N', 'E', 'S', 'W'];
+  const humanSeats = $derived(matchStore.value.setup.humans);
 
   function onBid(seat: Seat, bid: Bid): void {
-    matchStore.dispatch({ type: 'bid', seat, bid });
+    matchStore.submitHumanBid(seat, bid);
   }
 
   function onPlay(seat: Seat, card: Card): void {
-    matchStore.dispatch({ type: 'play', seat, card });
+    matchStore.submitHumanPlay(seat, card);
   }
 
   function nextDeal(): void {

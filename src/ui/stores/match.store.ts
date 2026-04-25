@@ -1,14 +1,32 @@
 // Store global Svelte (runes) du match en cours.
-import type { DealResult, DealState, MatchState, Seat } from '@core/types';
+// Pilote l'orchestrateur, expose l'état réactif au reste de l'UI.
+import type { Bid, Card, DealResult, DealState, MatchState, Seat } from '@core/types';
 import { createMatch, DEFAULT_SETTINGS, applyDealResult } from '@core/match';
-import { startDeal, apply, RedealRequired, type GameEvent, whoActs } from '@core/game-state';
-import { randomSeed, createRng } from '@core/rng';
+import { startDeal } from '@core/game-state';
+import { createRng, randomSeed } from '@core/rng';
+import type { AIConfig, AIPlayer } from '@ai/types';
+import { createAI } from '@ai/registry';
+import { Orchestrator } from '../orchestrator';
+
+interface PlayerSetup {
+  /** Sièges humains (0 ou 1 en pratique). */
+  humans: Seat[];
+  /** Niveau d'IA pour chaque siège non-humain. */
+  aiLevels: Partial<Record<Seat, AIConfig['level']>>;
+}
+
+const DEFAULT_SETUP: PlayerSetup = {
+  humans: ['S'],
+  aiLevels: { N: 2, E: 2, W: 2 },
+};
 
 interface UiState {
   match: MatchState;
   deal: DealState;
-  /** Seed dérivée pour la donne courante (différente du seed match pour varier). */
   dealSeed: number;
+  setup: PlayerSetup;
+  awaitingHuman: Seat | null;
+  paceMs: number;
 }
 
 function deriveDealSeed(matchSeed: number, dealIndex: number): number {
@@ -16,73 +34,127 @@ function deriveDealSeed(matchSeed: number, dealIndex: number): number {
   return Math.floor(r.next() * 0x100000000) >>> 0;
 }
 
-function createInitialDeal(
-  matchSeed: number,
-  dealIndex: number,
-  dealer: Seat,
-): { deal: DealState; seed: number } {
-  const seed = deriveDealSeed(matchSeed, dealIndex);
-  const deal = startDeal(seed, dealer);
-  return { deal, seed };
-}
-
 function makeStore() {
   let state = $state<UiState>(initial());
+  let orch: Orchestrator | null = null;
+  let aisDispose: AIPlayer[] = [];
 
   function initial(): UiState {
     const seed = randomSeed();
     const match = createMatch(DEFAULT_SETTINGS, seed);
-    const { deal, seed: dealSeed } = createInitialDeal(seed, 0, match.currentDealer);
-    return { match, deal, dealSeed };
+    const dealSeed = deriveDealSeed(seed, 0);
+    const deal = startDeal(dealSeed, match.currentDealer);
+    return {
+      match,
+      deal,
+      dealSeed,
+      setup: DEFAULT_SETUP,
+      awaitingHuman: null,
+      paceMs: 700,
+    };
+  }
+
+  function buildAis(setup: PlayerSetup, baseSeed: number): Partial<Record<Seat, AIPlayer>> {
+    const ais: Partial<Record<Seat, AIPlayer>> = {};
+    aisDispose.forEach((a) => a.dispose());
+    aisDispose = [];
+    for (const seat of ['N', 'E', 'S', 'W'] as const) {
+      if (setup.humans.includes(seat)) continue;
+      const level = setup.aiLevels[seat] ?? 2;
+      const ai = createAI(seat, { level, seed: baseSeed + seat.charCodeAt(0) });
+      ais[seat] = ai;
+      aisDispose.push(ai);
+    }
+    return ais;
+  }
+
+  function startOrchestrator(): void {
+    orch?.abort();
+    const ais = buildAis(state.setup, state.dealSeed);
+    orch = new Orchestrator(state.deal, { ais }, {
+      paceMs: state.paceMs,
+      onEvent: (_ev, _before, after) => {
+        state.deal = after;
+      },
+      onAwaitHuman: (seat) => {
+        state.awaitingHuman = seat;
+      },
+      onDealEnd: (final) => {
+        state.awaitingHuman = null;
+        if (final.phase.kind === 'scored') {
+          const result: DealResult = final.phase.result;
+          state.match = applyDealResult(state.match, result);
+        }
+      },
+      onRedeal: () => {
+        nextDeal();
+      },
+    });
+    void orch.run();
   }
 
   function newMatch(seed: number = randomSeed()): void {
+    orch?.abort();
     const match = createMatch(DEFAULT_SETTINGS, seed);
-    const { deal, seed: dealSeed } = createInitialDeal(seed, 0, match.currentDealer);
-    state = { match, deal, dealSeed };
-  }
-
-  function dispatch(event: GameEvent): void {
-    try {
-      const next = apply(state.deal, event);
-      state.deal = next;
-      if (next.phase.kind === 'scored') {
-        const result: DealResult = next.phase.result;
-        const updatedMatch = applyDealResult(state.match, result);
-        state.match = updatedMatch;
-      }
-    } catch (e) {
-      if (e instanceof RedealRequired) {
-        const dealIndex = state.match.deals.length;
-        const newDealer = state.match.currentDealer;
-        const { deal, seed } = createInitialDeal(state.match.seed, dealIndex + Date.now(), newDealer);
-        state.deal = deal;
-        state.dealSeed = seed;
-      } else {
-        throw e;
-      }
-    }
+    const dealSeed = deriveDealSeed(seed, 0);
+    const deal = startDeal(dealSeed, match.currentDealer);
+    state = {
+      match,
+      deal,
+      dealSeed,
+      setup: state.setup,
+      awaitingHuman: null,
+      paceMs: state.paceMs,
+    };
+    startOrchestrator();
   }
 
   function nextDeal(): void {
+    orch?.abort();
     if (state.match.finished) return;
     const dealIndex = state.match.deals.length;
     const dealer = state.match.currentDealer;
-    const { deal, seed } = createInitialDeal(state.match.seed, dealIndex, dealer);
-    state.deal = deal;
-    state.dealSeed = seed;
+    const dealSeed = deriveDealSeed(state.match.seed, dealIndex);
+    state.deal = startDeal(dealSeed, dealer);
+    state.dealSeed = dealSeed;
+    state.awaitingHuman = null;
+    startOrchestrator();
   }
+
+  function submitHumanBid(seat: Seat, bid: Bid): void {
+    if (!orch) return;
+    state.awaitingHuman = null;
+    orch.submitHumanAction({ type: 'bid', seat, bid });
+  }
+
+  function submitHumanPlay(seat: Seat, card: Card): void {
+    if (!orch) return;
+    state.awaitingHuman = null;
+    orch.submitHumanAction({ type: 'play', seat, card });
+  }
+
+  function setSetup(setup: PlayerSetup): void {
+    state.setup = setup;
+    newMatch(state.match.seed);
+  }
+
+  function setPace(ms: number): void {
+    state.paceMs = ms;
+  }
+
+  // Démarre l'orchestrateur sur l'état initial.
+  startOrchestrator();
 
   return {
     get value(): UiState {
       return state;
     },
-    get whoActs(): Seat | null {
-      return whoActs(state.deal);
-    },
     newMatch,
-    dispatch,
     nextDeal,
+    submitHumanBid,
+    submitHumanPlay,
+    setSetup,
+    setPace,
   };
 }
 

@@ -110,12 +110,18 @@ export function apply(state: DealState, event: GameEvent): DealState {
     if (event.card.suit !== playing.trump || (event.card.rank !== 'K' && event.card.rank !== 'Q')) {
       throw new Error('belote uniquement sur R ou D atout');
     }
-    if (!hasBeloteCombo(hand, playing.trump)) {
-      throw new Error('belote impossible : pas R+D atout en main');
+    const previousBelote = state.announcements.find((a) => a.seat === event.seat && a.kind === 'belote');
+    if (previousBelote) {
+      // Rebelote : vérifie qu'on n'annonce pas la même carte deux fois.
+      // En pratique : il faut juste que la carte jouée soit l'autre du couple.
+      // La cohérence (R puis D ou D puis R) est implicite vu qu'on ne peut jouer que ce qu'on a.
+      announcements = [...state.announcements, { kind: 'rebelote', seat: event.seat }];
+    } else {
+      if (!hasBeloteCombo(hand, playing.trump)) {
+        throw new Error('belote impossible : pas R+D atout en main');
+      }
+      announcements = [...state.announcements, { kind: 'belote', seat: event.seat }];
     }
-    const already = state.announcements.find((a) => a.seat === event.seat);
-    const kind: Announcement['kind'] = already ? 'rebelote' : 'belote';
-    announcements = [...state.announcements, { kind, seat: event.seat }];
   }
 
   // Pose la carte.
