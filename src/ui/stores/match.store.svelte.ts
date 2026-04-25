@@ -1,6 +1,7 @@
 // Store global Svelte (runes) du match en cours.
 // Pilote l'orchestrateur, expose l'état réactif au reste de l'UI.
 import type { Bid, Card, DealResult, DealState, MatchState, Seat, Trick } from '@core/types';
+import { nextSeat } from '@core/types';
 import { createMatch, applyDealResult } from '@core/match';
 import { startDeal } from '@core/game-state';
 import { legalMoves } from '@core/rules/legal-moves';
@@ -26,8 +27,11 @@ interface UiState {
   displayedTrick: Trick | null;
 }
 
-function deriveDealSeed(matchSeed: number, dealIndex: number): number {
-  const r = createRng(matchSeed ^ ((dealIndex * 0x9e3779b1) >>> 0));
+function deriveDealSeed(matchSeed: number, dealIndex: number, attempt = 0): number {
+  // L'attempt est mixé dans le seed pour qu'un redeal de la même donne tire de
+  // nouvelles cartes (sinon : tous passeraient à nouveau → boucle infinie).
+  const mix = ((dealIndex + 1) * 0x9e3779b1) ^ ((attempt + 1) * 0x85ebca6b);
+  const r = createRng((matchSeed ^ mix) >>> 0);
   return Math.floor(r.next() * 0x100000000) >>> 0;
 }
 
@@ -35,6 +39,8 @@ function makeStore() {
   let state = $state<UiState>(initial());
   let orch: Orchestrator | null = null;
   let aisDispose: AIPlayer[] = [];
+  /** Compteur de redistributions consécutives sur la donne courante. */
+  let redealAttempt = 0;
 
   function settingsToMatchSettings() {
     const s = settingsStore.value;
@@ -125,11 +131,11 @@ function makeStore() {
       },
       onDealEnd: (final) => {
         state.awaitingHuman = null;
+        redealAttempt = 0;
         if (final.phase.kind === 'scored') {
           const result: DealResult = final.phase.result;
           state.match = applyDealResult(state.match, result);
           if (settingsStore.value.autoNextDeal && !state.match.finished) {
-            // laisse voir le résultat un instant proportionnel à la cadence
             const ms = Math.min(4000, Math.max(1500, settingsStore.value.paceMs));
             setTimeout(() => {
               if (!state.match.finished) nextDeal();
@@ -138,7 +144,7 @@ function makeStore() {
         }
       },
       onRedeal: () => {
-        nextDeal();
+        redealNow();
       },
       onAiReasoning: (seat, kind, reasoning, card, bid) => {
         debugStore.push({
@@ -156,6 +162,7 @@ function makeStore() {
 
   function newMatch(seed: number = randomSeed()): void {
     orch?.abort();
+    redealAttempt = 0;
     const match = createMatch(settingsToMatchSettings(), seed);
     const dealSeed = deriveDealSeed(seed, 0);
     const deal = startDeal(dealSeed, match.currentDealer);
@@ -167,10 +174,30 @@ function makeStore() {
   function nextDeal(): void {
     orch?.abort();
     if (state.match.finished) return;
+    redealAttempt = 0;
     const dealIndex = state.match.deals.length;
     const dealer = state.match.currentDealer;
     const dealSeed = deriveDealSeed(state.match.seed, dealIndex);
     state.deal = startDeal(dealSeed, dealer);
+    state.dealSeed = dealSeed;
+    state.awaitingHuman = null;
+    state.displayedTrick = null;
+    startOrchestrator();
+  }
+
+  /** Redistribution après que tous ont passé deux tours.
+   *  - Le donneur tourne (antihoraire) — règle FFB §14
+   *  - Une nouvelle seed est dérivée via attempt incrémenté → cartes différentes
+   *  - Le score du match est inchangé (aucune donne n'a été marquée) */
+  function redealNow(): void {
+    orch?.abort();
+    if (state.match.finished) return;
+    redealAttempt += 1;
+    const dealIndex = state.match.deals.length;
+    const newDealer: Seat = nextSeat(state.match.currentDealer);
+    state.match = { ...state.match, currentDealer: newDealer };
+    const dealSeed = deriveDealSeed(state.match.seed, dealIndex, redealAttempt);
+    state.deal = startDeal(dealSeed, newDealer);
     state.dealSeed = dealSeed;
     state.awaitingHuman = null;
     state.displayedTrick = null;
