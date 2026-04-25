@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { CompletedTrick, Suit } from '@core/types';
   import { SEAT_TEAM } from '@core/types';
+  import { SEAT_SHORT, SUIT_GLYPH } from '@i18n/notation';
   import Card from './Card.svelte';
 
   interface Props {
@@ -59,17 +60,17 @@
     <div class="popover">
       <header>
         <strong>Dernier pli</strong>
-        <span class="winner">Gagné par <b>{last.winner}</b> · +{last.points} pts</span>
+        <span class="winner">Gagné par <b>{SEAT_SHORT[last.winner]}</b> · +{last.points} pts</span>
       </header>
       <div class="cards">
         {#each last.cards as pc, i (i)}
           <div class="played" data-seat={pc.seat}>
-            <span class="seat">{pc.seat}</span>
+            <span class="seat">{SEAT_SHORT[pc.seat]}</span>
             <Card card={pc.card} />
           </div>
         {/each}
       </div>
-      {#if trump}<div class="trump">Atout : {trump}</div>{/if}
+      {#if trump}<div class="trump">Atout : {SUIT_GLYPH[trump]}</div>{/if}
     </div>
   {/if}
 </div>

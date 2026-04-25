@@ -2,6 +2,7 @@
   import type { Bid, Card, DealState, Seat, Suit, Trick as TrickType } from '@core/types';
   import { legalMoves } from '@core/rules/legal-moves';
   import { expectedToPlay } from '@core/game-state';
+  import { SEAT_SHORT, SUIT_GLYPH } from '@i18n/notation';
   import Hand from './Hand.svelte';
   import Trick from './Trick.svelte';
   import BidPanel from './BidPanel.svelte';
@@ -15,6 +16,8 @@
     humanSeats: readonly Seat[];
     /** Sièges dont les cartes sont visibles (debug). N'autorise PAS l'interaction. */
     revealedSeats: readonly Seat[];
+    /** Disposition des cartes du pli. */
+    trickLayout?: 'cross' | 'inline';
     onBid: (seat: Seat, bid: Bid) => void;
     onPlay: (seat: Seat, card: Card) => void;
   }
@@ -24,6 +27,7 @@
     displayedTrick = null,
     humanSeats,
     revealedSeats,
+    trickLayout = 'cross',
     onBid,
     onPlay,
   }: Props = $props();
@@ -51,7 +55,7 @@
 
 <div class="table-grid">
   <div class="seat seat-N">
-    <div class="badge">N</div>
+    <div class="badge">{SEAT_SHORT.N}</div>
     <Hand
       cards={deal.hands.N}
       seat="N"
@@ -63,7 +67,7 @@
     />
   </div>
   <div class="seat seat-W">
-    <div class="badge">W</div>
+    <div class="badge">{SEAT_SHORT.W}</div>
     <Hand
       cards={deal.hands.W}
       seat="W"
@@ -80,13 +84,14 @@
       {#if isHuman(phase.phase.toAct)}
         <BidPanel phase={phase.phase} onBid={(b) => onBid(phase.phase.toAct, b)} />
       {:else}
-        <div class="info">En attente de {phase.phase.toAct}…</div>
+        <div class="info">En attente de {SEAT_SHORT[phase.phase.toAct]}…</div>
       {/if}
     {:else if phase.kind === 'playing'}
       <div class="trump-indic">
-        Atout : <strong>{phase.trump}</strong> · Preneur : <strong>{phase.taker}</strong>
+        Atout : <strong>{SUIT_GLYPH[phase.trump]}</strong> · Preneur :
+        <strong>{SEAT_SHORT[phase.taker]}</strong>
       </div>
-      <Trick trick={displayedTrick ?? phase.current} />
+      <Trick trick={displayedTrick ?? phase.current} layout={trickLayout} />
       <TricksRecap tricks={phase.tricks} trump={phase.trump} />
     {:else}
       <div class="result-box">
@@ -100,7 +105,7 @@
   </div>
 
   <div class="seat seat-E">
-    <div class="badge">E</div>
+    <div class="badge">{SEAT_SHORT.E}</div>
     <Hand
       cards={deal.hands.E}
       seat="E"
@@ -112,7 +117,7 @@
     />
   </div>
   <div class="seat seat-S">
-    <div class="badge">S</div>
+    <div class="badge">{SEAT_SHORT.S}</div>
     <Hand
       cards={deal.hands.S}
       seat="S"

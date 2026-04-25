@@ -23,11 +23,10 @@
     onPlay,
   }: Props = $props();
 
-  // Ordre fixe des couleurs avec atout en premier puis le reste alphabétique.
-  // Comparable même si trump est null (ordre par défaut).
+  // Ordre conventionnel français : atout d'abord, puis ♥ ♣ ♦ ♠ (alternance couleurs).
   function suitOrder(s: Suit): number {
     if (trump && s === trump) return 0;
-    return ({ H: 1, S: 2, D: 3, C: 4 } as Record<Suit, number>)[s];
+    return ({ H: 1, C: 2, D: 3, S: 4 } as Record<Suit, number>)[s];
   }
 
   const sorted = $derived(

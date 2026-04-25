@@ -1,10 +1,15 @@
 <script lang="ts">
   import { debugStore } from '../../stores/debug.store.svelte';
+  import { RANK_LABEL, SEAT_SHORT, SUIT_GLYPH } from '@i18n/notation';
+  import type { Card, Suit, Rank } from '@core/types';
 
   function fmt(v: unknown): string {
     if (typeof v === 'number') return v.toFixed(1);
     if (Array.isArray(v)) return v.map((x) => JSON.stringify(x)).join(', ');
     return String(v);
+  }
+  function lbl(c: Card): string {
+    return `${RANK_LABEL[c.rank as Rank]}${SUIT_GLYPH[c.suit as Suit]}`;
   }
 </script>
 
@@ -23,21 +28,36 @@
       {#each [...debugStore.entries].reverse() as e, idx (idx + '-' + e.ts + '-' + e.seat)}
         <li>
           <div class="head">
-            <span class="seat">{e.seat}</span>
-            <span class="kind">{e.kind}</span>
-            {#if e.card}<span class="card">{e.card.rank}{e.card.suit}</span>{/if}
-            {#if e.bid}<span class="card">{e.bid.kind === 'pass' ? 'pass' : 'take ' + e.bid.trump}</span>{/if}
+            <span class="seat">{SEAT_SHORT[e.seat]}</span>
+            <span class="kind">{e.kind === 'bid' ? 'enchère' : 'jeu'}</span>
+            {#if e.card}<span class="card">{lbl(e.card)}</span>{/if}
+            {#if e.bid}
+              <span class="card"
+                >{e.bid.kind === 'pass' ? 'passe' : 'prend ' + SUIT_GLYPH[e.bid.trump]}</span
+              >
+            {/if}
             <span class="lvl">L{e.reasoning.level}</span>
           </div>
           {#if 'candidates' in e.reasoning && e.reasoning.candidates.length > 0}
             <ul class="cands">
               {#each e.reasoning.candidates.slice(0, 5) as c}
-                {@const ext = c as { card: { rank: string; suit: string }; score: number; rationale: string; expectedScore?: number; stdev?: number; winRateInWorlds?: number }}
+                {@const ext = c as {
+                  card: Card;
+                  score: number;
+                  rationale: string;
+                  expectedScore?: number;
+                  stdev?: number;
+                  winRateInWorlds?: number;
+                }}
                 <li>
-                  <strong>{ext.card.rank}{ext.card.suit}</strong>
+                  <strong>{lbl(ext.card)}</strong>
                   <span>score={fmt(ext.score)}</span>
                   {#if ext.expectedScore !== undefined}
-                    <span>E={fmt(ext.expectedScore)} σ={fmt(ext.stdev ?? 0)} win={((ext.winRateInWorlds ?? 0) * 100).toFixed(0)}%</span>
+                    <span
+                      >E={fmt(ext.expectedScore)} σ={fmt(ext.stdev ?? 0)} win={(
+                        (ext.winRateInWorlds ?? 0) * 100
+                      ).toFixed(0)}%</span
+                    >
                   {/if}
                   <em>{ext.rationale}</em>
                 </li>

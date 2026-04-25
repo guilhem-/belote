@@ -14,6 +14,8 @@ export const SettingsSchemaV1 = z.object({
   targetPoints: z.union([z.literal(501), z.literal(1000), z.literal(1501)]),
   targetDeals: z.number().int().min(1).max(50),
   beloteEnabled: z.boolean(),
+  /** Disposition des cartes du pli : en croix géographique (défaut) ou en ligne. */
+  trickLayout: z.enum(['cross', 'inline']).default('cross'),
 });
 
 export type Settings = z.infer<typeof SettingsSchemaV1>;
@@ -27,4 +29,5 @@ export const DEFAULT_SETTINGS_V1: Settings = {
   targetPoints: 501,
   targetDeals: 4,
   beloteEnabled: true,
+  trickLayout: 'cross',
 };

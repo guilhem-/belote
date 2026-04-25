@@ -6,6 +6,7 @@
   import Scoreboard from '../components/Scoreboard.svelte';
   import SettingsPanel from '../components/SettingsPanel.svelte';
   import ReasoningPanel from '../components/debug/ReasoningPanel.svelte';
+  import { SEAT_SHORT as seatShort } from '@i18n/notation';
   import type { Bid, Card, Seat } from '@core/types';
 
   let settingsOpen = $state(false);
@@ -59,6 +60,7 @@
       displayedTrick={matchStore.value.displayedTrick}
       {humanSeats}
       {revealedSeats}
+      trickLayout={settingsStore.value.trickLayout}
       {onBid}
       {onPlay}
     />
@@ -66,7 +68,7 @@
 
   <footer class="footer">
     <span>Seed donne : 0x{matchStore.value.dealSeed.toString(16)}</span>
-    <span>Donneur : {matchStore.value.deal.dealer}</span>
+    <span>Donneur : {seatShort[matchStore.value.deal.dealer]}</span>
     <span>Cadence : {(settingsStore.value.paceMs / 1000).toFixed(1)}s</span>
   </footer>
 

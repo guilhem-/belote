@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Card as CardType, Suit } from '@core/types';
+  import type { Card as CardType } from '@core/types';
+  import { RANK_LABEL, SUIT_GLYPH, SUIT_IS_RED } from '@i18n/notation';
 
   interface Props {
     card: CardType | null;
@@ -18,10 +19,6 @@
     dimmed = false,
     onclick,
   }: Props = $props();
-
-  const SUIT_GLYPH: Record<Suit, string> = { H: '♥', D: '♦', C: '♣', S: '♠' };
-  const SUIT_RED: Record<Suit, boolean> = { H: true, D: true, C: false, S: false };
-  const RANK_LABEL: Record<string, string> = { '7': '7', '8': '8', '9': '9', '10': '10', J: 'V', Q: 'D', K: 'R', A: 'A' };
 </script>
 
 {#if facedown || !card}
@@ -30,7 +27,7 @@
   <button
     type="button"
     class="card"
-    class:red={SUIT_RED[card.suit]}
+    class:red={SUIT_IS_RED[card.suit]}
     class:selectable
     class:highlighted
     class:dimmed

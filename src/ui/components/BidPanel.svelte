@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { Bid, BidPhase, Suit } from '@core/types';
+  import type { Bid, BidPhase } from '@core/types';
   import { legalBids } from '@core/bidding';
+  import { SEAT_SHORT, SUIT_GLYPH } from '@i18n/notation';
   import CardView from './Card.svelte';
 
   interface Props {
@@ -11,8 +12,6 @@
   const { phase, onBid }: Props = $props();
   const bids = $derived(legalBids(phase));
 
-  const SUIT_GLYPH: Record<Suit, string> = { H: '♥', D: '♦', C: '♣', S: '♠' };
-
   function label(b: Bid): string {
     if (b.kind === 'pass') return 'Passer';
     return `Prendre ${SUIT_GLYPH[b.trump]}`;
@@ -21,7 +20,7 @@
 
 <div class="bid-panel">
   <div class="info">
-    <div>Tour {phase.round} — à <strong>{phase.toAct}</strong></div>
+    <div>Tour {phase.round} — à <strong>{SEAT_SHORT[phase.toAct]}</strong></div>
     <div class="face-up">
       <span>Retourne :</span>
       <CardView card={phase.faceUp} />
@@ -36,7 +35,9 @@
     <div class="history">
       <strong>Annonces :</strong>
       {#each phase.bids as b, i (i)}
-        <span>{b.seat}: {b.bid.kind === 'pass' ? 'pass' : 'take ' + SUIT_GLYPH[b.bid.trump]}</span>
+        <span
+          >{SEAT_SHORT[b.seat]}: {b.bid.kind === 'pass' ? 'passe' : 'prend ' + SUIT_GLYPH[b.bid.trump]}</span
+        >
       {/each}
     </div>
   {/if}
@@ -86,4 +87,3 @@
     gap: 12px;
   }
 </style>
-

@@ -44,7 +44,7 @@ test.describe('captures visuelles', () => {
     await page.goto('/');
     // Force scénario simple : 0 humain, cadence rapide.
     await page.getByRole('button', { name: 'Paramètres' }).click();
-    await page.getByRole('checkbox', { name: /S humain/ }).uncheck();
+    await page.getByRole('checkbox', { name: /Sud humain/ }).uncheck();
     await page.getByRole('button', { name: /Rapide/ }).click();
     await page.getByRole('button', { name: /Appliquer/ }).click();
     await page.getByRole('button', { name: /Voir pensées IA/ }).click();

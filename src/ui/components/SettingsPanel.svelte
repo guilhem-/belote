@@ -2,6 +2,7 @@
   import { settingsStore } from '../stores/settings.store.svelte';
   import type { Seat } from '@core/types';
   import type { AILevel } from '@ai/types';
+  import { SEAT_FULL } from '@i18n/notation';
 
   interface Props {
     onApply: () => void;
@@ -54,11 +55,18 @@
         {#each SEATS as s}
           <div class="seat-row">
             <label>
-              <input type="checkbox" checked={settingsStore.value.humans.includes(s)} onchange={() => toggleHuman(s)} />
-              {s} humain
+              <input
+                type="checkbox"
+                checked={settingsStore.value.humans.includes(s)}
+                onchange={() => toggleHuman(s)}
+              />
+              {SEAT_FULL[s]} humain
             </label>
             {#if !settingsStore.value.humans.includes(s)}
-              <select value={settingsStore.value.aiLevels[s] ?? 4} onchange={(e) => setLevel(s, Number(e.currentTarget.value) as AILevel)}>
+              <select
+                value={settingsStore.value.aiLevels[s] ?? 4}
+                onchange={(e) => setLevel(s, Number(e.currentTarget.value) as AILevel)}
+              >
                 {#each LEVELS as l}
                   <option value={l}>Niveau {l}{l === 5 ? ' (PIMC)' : ''}</option>
                 {/each}
@@ -106,9 +114,38 @@
     <section>
       <h3>Annonces</h3>
       <label>
-        <input type="checkbox" checked={settingsStore.value.beloteEnabled} onchange={(e) => settingsStore.set((c) => ({ ...c, beloteEnabled: e.currentTarget.checked }))} />
+        <input
+          type="checkbox"
+          checked={settingsStore.value.beloteEnabled}
+          onchange={(e) =>
+            settingsStore.set((c) => ({ ...c, beloteEnabled: e.currentTarget.checked }))}
+        />
         Belote / Rebelote activée
       </label>
+    </section>
+
+    <section>
+      <h3>Disposition du pli</h3>
+      <div class="layout-choice">
+        <label>
+          <input
+            type="radio"
+            name="trick-layout"
+            checked={settingsStore.value.trickLayout === 'cross'}
+            onchange={() => settingsStore.set((c) => ({ ...c, trickLayout: 'cross' }))}
+          />
+          En croix (Nord en haut, Sud en bas, Ouest à gauche, Est à droite)
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="trick-layout"
+            checked={settingsStore.value.trickLayout === 'inline'}
+            onchange={() => settingsStore.set((c) => ({ ...c, trickLayout: 'inline' }))}
+          />
+          En ligne (ordre chronologique)
+        </label>
+      </div>
     </section>
 
     <footer class="actions">
@@ -196,6 +233,12 @@
     background: #f59e0b;
     color: black;
     border-color: #f59e0b;
+  }
+  .layout-choice {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
   }
   .custom {
     display: block;
