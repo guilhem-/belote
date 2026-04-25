@@ -87,11 +87,13 @@ export interface BeliefSnapshot {
   }>;
 }
 
-/** Événement observable par l'IA — pousse par l'orchestrateur AVANT chaque décision. */
+/** Événement observable par l'IA — pousse par l'orchestrateur AVANT chaque décision.
+ *  - 'final-hand' contient toujours la main de l'IA destinataire (orchestrateur fait un envoi par IA). */
 export type ObservableEvent =
   | { type: 'deal-start'; dealer: Seat; ownSeat: Seat; ownHand: readonly Card[]; faceUp: Card }
   | { type: 'bid'; seat: Seat; bid: Bid }
-  | { type: 'bidding-end'; taker: Seat; trump: Suit; tookFaceUp: boolean; ownHand: readonly Card[] }
+  | { type: 'bidding-end'; taker: Seat; trump: Suit; tookFaceUp: boolean }
+  | { type: 'final-hand'; ownSeat: Seat; ownHand: readonly Card[] }
   | { type: 'play'; seat: Seat; card: Card }
   | { type: 'belote-announce'; seat: Seat; kind: 'belote' | 'rebelote' }
   | { type: 'trick-end'; winner: Seat; points: number }

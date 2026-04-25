@@ -2,6 +2,8 @@ import type { Seat } from '@core/types';
 import type { AIConfig, AIPlayer } from './types';
 import { createLevel1AI } from './level1-random';
 import { createLevel2AI } from './level2-heuristic';
+import { createLevel3AI } from './level3-tracker';
+import { createLevel4AI } from './level4-deductive';
 
 export function createAI(seat: Seat, config: AIConfig): AIPlayer {
   switch (config.level) {
@@ -10,9 +12,11 @@ export function createAI(seat: Seat, config: AIConfig): AIPlayer {
     case 2:
       return createLevel2AI(seat, config);
     case 3:
+      return createLevel3AI(seat, config);
     case 4:
+      return createLevel4AI(seat, config);
     case 5:
-      // À implémenter aux étapes E (3-4) et G (5). Fallback niveau 2 en attendant.
-      return createLevel2AI(seat, config);
+      // Étape G — fallback niveau 4 en attendant le PIMC.
+      return createLevel4AI(seat, config);
   }
 }

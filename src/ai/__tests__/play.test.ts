@@ -5,7 +5,7 @@ import { createAI } from '@ai/registry';
 import type { Seat } from '@core/types';
 import { createMatch, DEFAULT_SETTINGS, applyDealResult } from '@core/match';
 
-async function playFullMatch(seedMatch: number, levelA: 1 | 2, levelB: 1 | 2, deals: number): Promise<{ ns: number; ew: number; nsWins: number; ewWins: number }> {
+async function playFullMatch(seedMatch: number, levelA: 1 | 2 | 3 | 4 | 5, levelB: 1 | 2 | 3 | 4 | 5, deals: number): Promise<{ ns: number; ew: number; nsWins: number; ewWins: number }> {
   let nsWins = 0;
   let ewWins = 0;
   let nsTotal = 0;
@@ -54,6 +54,13 @@ describe('IA niveau 1 vs niveau 2 — tournoi rapide', () => {
     const r = await playFullMatch(0xabcd, 2, 1, 30);
     expect(r.ns).toBeGreaterThan(r.ew);
   }, 30000);
+});
+
+describe('IA niveau 4 vs niveau 2 — progression', () => {
+  it('niveau 4 marque plus que niveau 2 sur 40 donnes', async () => {
+    const r = await playFullMatch(0xbeef, 4, 2, 40);
+    expect(r.ns).toBeGreaterThan(r.ew);
+  }, 60000);
 });
 
 describe('Orchestrator — partie complète sans erreur', () => {

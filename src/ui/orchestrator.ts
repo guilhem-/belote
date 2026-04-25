@@ -78,12 +78,24 @@ export class Orchestrator {
   private async stepAi(seat: Seat): Promise<void> {
     const ai = this.setup.ais[seat]!;
     if (this.state.phase.kind === 'bidding') {
+      const beforePhase = this.state.phase;
       const allowed = legalBids(this.state.phase.phase);
       const decision = await ai.chooseBid(redactState(this.state, seat), allowed);
       await this.delay();
       this.applyEvent({ type: 'bid', seat, bid: decision.bid });
-      // observe pour toutes les IA
       this.broadcast({ type: 'bid', seat, bid: decision.bid });
+      const newPhase = this.state.phase as DealState['phase'];
+      if (newPhase.kind === 'playing') {
+        this.broadcast({
+          type: 'bidding-end',
+          taker: newPhase.taker,
+          trump: newPhase.trump,
+          tookFaceUp: beforePhase.phase.round === 1,
+        });
+        for (const [s, p] of Object.entries(this.setup.ais)) {
+          p?.observe({ type: 'final-hand', ownSeat: s as Seat, ownHand: this.state.hands[s as Seat] });
+        }
+      }
     } else if (this.state.phase.kind === 'playing') {
       const legal = legalMoves(this.state.hands[seat], this.state.phase.current, this.state.phase.trump, seat);
       const decision = await ai.chooseCard(redactState(this.state, seat), legal);
