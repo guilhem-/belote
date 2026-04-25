@@ -1,6 +1,6 @@
 // Store global Svelte (runes) du match en cours.
 // Pilote l'orchestrateur, expose l'état réactif au reste de l'UI.
-import type { Bid, Card, DealResult, DealState, MatchState, Seat } from '@core/types';
+import type { Bid, Card, DealResult, DealState, MatchState, Seat, Trick } from '@core/types';
 import { createMatch, applyDealResult } from '@core/match';
 import { startDeal } from '@core/game-state';
 import { createRng, randomSeed } from '@core/rng';
@@ -20,6 +20,9 @@ interface UiState {
   deal: DealState;
   dealSeed: number;
   awaitingHuman: Seat | null;
+  /** Si non-null, on affiche ce pli (4 cartes complétées) au lieu du pli courant
+   *  pendant la pause "voir le pli" liée à la cadence. */
+  displayedTrick: Trick | null;
 }
 
 function deriveDealSeed(matchSeed: number, dealIndex: number): number {
@@ -56,7 +59,7 @@ function makeStore() {
     );
     const dealSeed = deriveDealSeed(seed, 0);
     const deal = startDeal(dealSeed, match.currentDealer);
-    return { match, deal, dealSeed, awaitingHuman: null };
+    return { match, deal, dealSeed, awaitingHuman: null, displayedTrick: null };
   }
 
   function buildAis(baseSeed: number): Partial<Record<Seat, AIPlayer>> {
@@ -83,6 +86,17 @@ function makeStore() {
       onEvent: (_ev, _before, after) => {
         state.deal = after;
       },
+      onTrickComplete: (trick) =>
+        new Promise<void>((resolve) => {
+          // Affiche le pli complet pendant ~60% de la cadence, clamp [400ms, 3000ms].
+          const pace = settingsStore.value.paceMs;
+          const ms = Math.min(3000, Math.max(400, Math.round(pace * 0.6)));
+          state.displayedTrick = { leader: trick.leader, cards: trick.cards.slice() };
+          setTimeout(() => {
+            state.displayedTrick = null;
+            resolve();
+          }, ms);
+        }),
       onAwaitHuman: (seat) => {
         state.awaitingHuman = seat;
       },
@@ -115,7 +129,7 @@ function makeStore() {
     const match = createMatch(settingsToMatchSettings(), seed);
     const dealSeed = deriveDealSeed(seed, 0);
     const deal = startDeal(dealSeed, match.currentDealer);
-    state = { match, deal, dealSeed, awaitingHuman: null };
+    state = { match, deal, dealSeed, awaitingHuman: null, displayedTrick: null };
     debugStore.clear();
     startOrchestrator();
   }
@@ -129,6 +143,7 @@ function makeStore() {
     state.deal = startDeal(dealSeed, dealer);
     state.dealSeed = dealSeed;
     state.awaitingHuman = null;
+    state.displayedTrick = null;
     startOrchestrator();
   }
 

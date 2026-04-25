@@ -54,7 +54,14 @@
   </header>
 
   <main class="main">
-    <Table deal={matchStore.value.deal} {humanSeats} {revealedSeats} {onBid} {onPlay} />
+    <Table
+      deal={matchStore.value.deal}
+      displayedTrick={matchStore.value.displayedTrick}
+      {humanSeats}
+      {revealedSeats}
+      {onBid}
+      {onPlay}
+    />
   </main>
 
   <footer class="footer">

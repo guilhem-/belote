@@ -20,6 +20,9 @@ export interface OrchestratorCallbacks {
   paceMs?: number;
   /** Capture le Reasoning de chaque décision IA pour le panneau debug. */
   onAiReasoning?: (seat: Seat, kind: 'bid' | 'play', reasoning: BidReasoning | PlayReasoning, card?: Card, bid?: Bid) => void;
+  /** Appelé après que le 4e coup a été appliqué. Le callback peut retourner une promesse
+   *  pour bloquer la résolution UI (laisse le pli visible le temps voulu). */
+  onTrickComplete?: (completedTrick: { leader: Seat; cards: readonly { seat: Seat; card: Card }[]; winner: Seat; points: number }) => Promise<void>;
 }
 
 export interface PlayerSetup {
@@ -68,6 +71,12 @@ export class Orchestrator {
         await this.stepAi(seat);
       } else {
         await this.awaitHuman(seat);
+      }
+      // Si un pli vient d'être complété, on attend la fin de la pause UI avant de continuer.
+      if (this.pendingTrickPause) {
+        const p = this.pendingTrickPause;
+        this.pendingTrickPause = null;
+        await p;
       }
     }
     if (this.state.phase.kind === 'scored') {
@@ -144,18 +153,21 @@ export class Orchestrator {
       const after = apply(before, event);
       this.state = after;
       this.cb.onEvent?.(event, before, after);
-      // Détection fin de pli (longueur revenue à 0 entre before et after).
+      // Détection fin de pli.
+      let completedTrick: { winner: Seat; points: number; leader: Seat; cards: readonly { seat: Seat; card: Card }[] } | null = null;
       if (
         before.phase.kind === 'playing' &&
         after.phase.kind === 'playing' &&
         before.phase.current.cards.length === 3 &&
         after.phase.current.cards.length === 0
       ) {
-        const completed = after.phase.tricks[after.phase.tricks.length - 1];
-        if (completed) this.broadcast({ type: 'trick-end', winner: completed.winner, points: completed.points });
+        completedTrick = after.phase.tricks[after.phase.tricks.length - 1] ?? null;
       } else if (before.phase.kind === 'playing' && after.phase.kind === 'scored') {
-        const completed = after.phase.result.tricks[7];
-        if (completed) this.broadcast({ type: 'trick-end', winner: completed.winner, points: completed.points });
+        completedTrick = after.phase.result.tricks[7] ?? null;
+      }
+      if (completedTrick) {
+        this.broadcast({ type: 'trick-end', winner: completedTrick.winner, points: completedTrick.points });
+        this.pendingTrickPause = this.cb.onTrickComplete?.(completedTrick) ?? null;
       }
     } catch (e) {
       if (e instanceof RedealRequired) {
@@ -166,6 +178,8 @@ export class Orchestrator {
       }
     }
   }
+
+  private pendingTrickPause: Promise<void> | null = null;
 
   private broadcast(event: ObservableEvent): void {
     for (const ai of Object.values(this.setup.ais)) {

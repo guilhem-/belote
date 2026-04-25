@@ -1,13 +1,16 @@
 <script lang="ts">
-  import type { Bid, Card, DealState, Seat } from '@core/types';
+  import type { Bid, Card, DealState, Seat, Suit, Trick as TrickType } from '@core/types';
   import { legalMoves } from '@core/rules/legal-moves';
   import { expectedToPlay } from '@core/game-state';
   import Hand from './Hand.svelte';
   import Trick from './Trick.svelte';
   import BidPanel from './BidPanel.svelte';
+  import TricksRecap from './TricksRecap.svelte';
 
   interface Props {
     deal: DealState;
+    /** Pli figé à afficher (override) pendant la pause "voir le pli". */
+    displayedTrick?: TrickType | null;
     /** Sièges contrôlés par un humain (donc cartes visibles + interactives). */
     humanSeats: readonly Seat[];
     /** Sièges dont les cartes sont visibles (debug). N'autorise PAS l'interaction. */
@@ -16,9 +19,17 @@
     onPlay: (seat: Seat, card: Card) => void;
   }
 
-  const { deal, humanSeats, revealedSeats, onBid, onPlay }: Props = $props();
+  const {
+    deal,
+    displayedTrick = null,
+    humanSeats,
+    revealedSeats,
+    onBid,
+    onPlay,
+  }: Props = $props();
 
   const phase = $derived(deal.phase);
+  const trump: Suit | null = $derived(phase.kind === 'playing' ? phase.trump : null);
   const acting = $derived.by(() => {
     if (phase.kind === 'bidding') return phase.phase.toAct;
     if (phase.kind === 'playing') return expectedToPlay(phase.current);
@@ -47,6 +58,7 @@
       facedown={!isRevealed('N')}
       legalCards={acting === 'N' ? legalForActing : undefined}
       canPlay={phase.kind === 'playing' && acting === 'N' && isHuman('N')}
+      {trump}
       onPlay={(c) => onPlay('N', c)}
     />
   </div>
@@ -58,6 +70,7 @@
       facedown={!isRevealed('W')}
       legalCards={acting === 'W' ? legalForActing : undefined}
       canPlay={phase.kind === 'playing' && acting === 'W' && isHuman('W')}
+      {trump}
       onPlay={(c) => onPlay('W', c)}
     />
   </div>
@@ -70,15 +83,18 @@
         <div class="info">En attente de {phase.phase.toAct}…</div>
       {/if}
     {:else if phase.kind === 'playing'}
-      <div class="trump-indic">Atout : <strong>{phase.trump}</strong> · Preneur : <strong>{phase.taker}</strong></div>
-      <Trick trick={phase.current} />
-      <div class="counts">Plis joués : {phase.tricks.length}/8</div>
+      <div class="trump-indic">
+        Atout : <strong>{phase.trump}</strong> · Preneur : <strong>{phase.taker}</strong>
+      </div>
+      <Trick trick={displayedTrick ?? phase.current} />
+      <TricksRecap tricks={phase.tricks} trump={phase.trump} />
     {:else}
       <div class="result-box">
         <h3>Donne terminée</h3>
         <div>NS : {phase.result.nsScore} · EO : {phase.result.ewScore}</div>
         {#if phase.result.dedans}<div>Dedans !</div>{/if}
         {#if phase.result.capot}<div>Capot {phase.result.capot}</div>{/if}
+        <TricksRecap tricks={phase.result.tricks} trump={phase.result.trump} />
       </div>
     {/if}
   </div>
@@ -91,6 +107,7 @@
       facedown={!isRevealed('E')}
       legalCards={acting === 'E' ? legalForActing : undefined}
       canPlay={phase.kind === 'playing' && acting === 'E' && isHuman('E')}
+      {trump}
       onPlay={(c) => onPlay('E', c)}
     />
   </div>
@@ -102,6 +119,7 @@
       facedown={!isRevealed('S')}
       legalCards={acting === 'S' ? legalForActing : undefined}
       canPlay={phase.kind === 'playing' && acting === 'S' && isHuman('S')}
+      {trump}
       onPlay={(c) => onPlay('S', c)}
     />
   </div>
@@ -163,10 +181,6 @@
     background: rgba(0, 0, 0, 0.4);
     padding: 4px 12px;
     border-radius: 6px;
-  }
-  .counts {
-    font-size: 12px;
-    opacity: 0.8;
   }
   .result-box {
     background: rgba(0, 0, 0, 0.5);
