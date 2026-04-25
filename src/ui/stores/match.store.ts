@@ -6,7 +6,14 @@ import { startDeal } from '@core/game-state';
 import { createRng, randomSeed } from '@core/rng';
 import type { AIConfig, AIPlayer } from '@ai/types';
 import { createAI } from '@ai/registry';
+import { createWorkerAI } from '@/workers/ai.client';
 import { Orchestrator } from '../orchestrator';
+
+/** Bascule globale : utiliser le worker pour les IA niveau 5 (et 4 par sécurité).
+ *  Pour 1-3, exécution main thread (rapide, évite ping-pong inutile). */
+function useWorkerForLevel(level: AIConfig['level']): boolean {
+  return level >= 4;
+}
 
 interface PlayerSetup {
   /** Sièges humains (0 ou 1 en pratique). */
@@ -61,7 +68,8 @@ function makeStore() {
     for (const seat of ['N', 'E', 'S', 'W'] as const) {
       if (setup.humans.includes(seat)) continue;
       const level = setup.aiLevels[seat] ?? 2;
-      const ai = createAI(seat, { level, seed: baseSeed + seat.charCodeAt(0) });
+      const cfg: AIConfig = { level, seed: baseSeed + seat.charCodeAt(0) };
+      const ai = useWorkerForLevel(level) ? createWorkerAI(seat, cfg) : createAI(seat, cfg);
       ais[seat] = ai;
       aisDispose.push(ai);
     }

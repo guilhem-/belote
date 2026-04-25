@@ -4,6 +4,7 @@ import { createLevel1AI } from './level1-random';
 import { createLevel2AI } from './level2-heuristic';
 import { createLevel3AI } from './level3-tracker';
 import { createLevel4AI } from './level4-deductive';
+import { createLevel5AI } from './level5-pimc';
 
 export function createAI(seat: Seat, config: AIConfig): AIPlayer {
   switch (config.level) {
@@ -16,7 +17,6 @@ export function createAI(seat: Seat, config: AIConfig): AIPlayer {
     case 4:
       return createLevel4AI(seat, config);
     case 5:
-      // Étape G — fallback niveau 4 en attendant le PIMC.
-      return createLevel4AI(seat, config);
+      return createLevel5AI(seat, config);
   }
 }

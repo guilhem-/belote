@@ -63,6 +63,14 @@ describe('IA niveau 4 vs niveau 2 — progression', () => {
   }, 60000);
 });
 
+describe('IA niveau 5 — joue une donne sans crash', () => {
+  it('partie 5 vs 3 sur 5 donnes (smoke test)', async () => {
+    const r = await playFullMatch(0xc0de, 5, 3, 5);
+    // pas d'assertion de victoire ici (peu de donnes) — juste no crash et points distribués
+    expect(r.ns + r.ew).toBeGreaterThan(0);
+  }, 90000);
+});
+
 describe('Orchestrator — partie complète sans erreur', () => {
   it('joue 5 donnes 4 IA niv 2 sans crash', async () => {
     let match = createMatch(DEFAULT_SETTINGS, 0x1234);
