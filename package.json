@@ -14,7 +14,8 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "tournament": "tsx scripts/tournament.ts",
-    "benchmark": "tsx scripts/benchmark-ai.ts"
+    "benchmark": "tsx scripts/benchmark-ai.ts",
+    "ci": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
