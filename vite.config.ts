@@ -2,7 +2,12 @@ import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 
+// Sur GitHub Pages, le site est servi sous /belote/. En dev local, base reste '/'.
+// Override possible via env BASE_PATH (utile pour tester d'autres déploiements).
+const base = process.env.BASE_PATH ?? (process.env.GITHUB_ACTIONS ? '/belote/' : '/');
+
 export default defineConfig({
+  base,
   plugins: [svelte()],
   resolve: {
     alias: {
