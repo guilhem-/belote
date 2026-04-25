@@ -25,6 +25,14 @@
 // F5 — Garde de coupe
 //   Si une couleur est déjà coupée (par moi ou partenaire), je conserve mes cartes
 //   non-atout de cette couleur (elles deviennent "petites garanties").
+//
+// F6 — Appel par défausse (direct + indirect)
+//   ÉMISSION : quand je défausse hors-atout (couleur demandée non-atout absente, partenaire
+//   pas maître ou pas d'atout/pas obligation), le choix de la carte signale au partenaire :
+//     - défausse PETITE (7/8/9) d'une couleur = appel direct ("joue cette couleur, j'y suis fort")
+//     - défausse FORTE (A/10) d'une couleur = appel indirect ("n'aime pas, joue les autres")
+//   Le tracker enregistre les défausses du partenaire ; en entame, je biaise vers la couleur
+//   appelée et j'évite la couleur refusée.
 
 import type { Bid, Card, DealState, Seat, Suit } from '@core/types';
 import { partner } from '@core/types';
@@ -40,8 +48,9 @@ export interface ImprovedFlags {
   receiveDirectCall?: boolean;     // F1
   underAceTheJack?: boolean;       // F2
   takerPullsTrumpLong?: boolean;   // F3
-  cutEconomical?: boolean;         // F4 (renforcé)
+  cutEconomical?: boolean;         // F4
   cutGuard?: boolean;              // F5
+  discardSignals?: boolean;        // F6
 }
 
 /** Toutes les améliorations activées. */
@@ -51,6 +60,7 @@ export const ALL_IMPROVEMENTS: ImprovedFlags = {
   takerPullsTrumpLong: true,
   cutEconomical: true,
   cutGuard: true,
+  discardSignals: true,
 };
 
 interface ConfigWithFlags extends AIConfig {
@@ -247,6 +257,16 @@ function scoreLevel4Improved(
 
   if (trick.cards.length === 0) {
     // === ENTAME ===
+    // F6 réception : si partenaire a appelé une couleur via défausse, biais vers cette couleur.
+    const sig = _tracker.partnerSignals();
+    if (flags.discardSignals && sig.calledSuit === card.suit && card.suit !== trump) {
+      score += 18;
+      conventions.push(`réponse appel ${card.suit} (défausse partenaire)`);
+    } else if (flags.discardSignals && sig.deniedSuit === card.suit && card.suit !== trump) {
+      score -= 12;
+      conventions.push(`évite ${card.suit} (refus partenaire)`);
+    }
+
     // F3 : Preneur tire atout long
     if (
       flags.takerPullsTrumpLong &&
@@ -359,7 +379,25 @@ function scoreLevel4Improved(
     return { score, rationale };
   }
 
-  // Sous le maître adverse.
+  // Sous le maître adverse — c'est ici que se font les défausses.
+  // F6 émission : si je défausse (carte hors couleur demandée et hors atout, perdu de toute façon),
+  // mon choix signale au partenaire la couleur que je veux.
+  const ledSuit = trick.cards[0]!.card.suit;
+  const isDiscard = card.suit !== ledSuit && card.suit !== trump;
+  if (flags.discardSignals && isDiscard) {
+    // Petite carte (7/8/9) : "joue cette couleur"
+    if (card.rank === '7' || card.rank === '8' || card.rank === '9') {
+      score += 6;
+      conventions.push(`appel direct ${card.suit} par défausse`);
+    }
+    // Grosse carte (A/10) : "n'aime pas cette couleur"
+    // Mais on perd les points → équilibrer : faiblement positif uniquement si les autres défausses
+    // dans cette couleur ne sont pas critiques.
+    // Pour l'appel indirect, on préfère ne pas sacrifier As/10 sauf si on a un signal cohérent.
+    // Ici on n'incite PAS à défausser fort (trop coûteux en points). L'appel indirect émerge
+    // simplement par exclusion : si le partenaire ne nous voit pas appeler ♣, c'est qu'on aime ♦/♠.
+  }
+
   score -= cardPoints(card, trump);
   if (card.suit === trump) score -= 8;
   if (card.suit !== trump && (card.rank === 'A' || card.rank === '10')) score -= 10;

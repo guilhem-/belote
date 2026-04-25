@@ -50,9 +50,38 @@ const variants: Variant[] = [
       createLevel4Improved(seat, { level: 4, seed, improvements: { cutGuard: true } }),
   },
   {
+    name: 'F6 discardSignals',
+    factory: (seat, seed) =>
+      createLevel4Improved(seat, { level: 4, seed, improvements: { discardSignals: true } }),
+  },
+  {
     name: 'ALL improvements',
     factory: (seat, seed) =>
       createLevel4Improved(seat, { level: 4, seed, improvements: ALL_IMPROVEMENTS }),
+  },
+  {
+    name: 'F1+F6 (best two)',
+    factory: (seat, seed) =>
+      createLevel4Improved(seat, {
+        level: 4,
+        seed,
+        improvements: { receiveDirectCall: true, discardSignals: true },
+      }),
+  },
+  {
+    name: 'ALL except F5',
+    factory: (seat, seed) =>
+      createLevel4Improved(seat, {
+        level: 4,
+        seed,
+        improvements: {
+          receiveDirectCall: true,
+          underAceTheJack: true,
+          takerPullsTrumpLong: true,
+          cutEconomical: true,
+          discardSignals: true,
+        },
+      }),
   },
 ];
 
@@ -152,7 +181,9 @@ async function playMatch(
   let match = createMatch(DEFAULT_SETTINGS, seedMatch);
   let dealer: Seat = 'N';
   for (let i = 0; i < deals; i++) {
-    // NS = teamA, EW = teamB
+    // NS = teamA (partagent les mêmes conventions), EW = teamB (idem).
+    // Les partenaires sont garantis d'utiliser le même builder, condition sine qua non
+    // pour qu'un signal entre eux soit interprété de la même manière.
     const ais: Record<Seat, AIPlayer> = {
       N: teamA.factory('N', seedMatch + i + 1),
       S: teamA.factory('S', seedMatch + i + 100),

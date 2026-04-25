@@ -35,6 +35,10 @@ export class CardTracker {
 
   /** Bids passés / take : utile pour inférer la non-possession (passe sur retourne ♥ → moins probable J♥). */
   private bidHistory: { seat: Seat; passed: boolean; trump: Suit | null }[] = [];
+  /** Signal du partenaire via défausse : couleur demandée (appel direct par petite carte). */
+  private partnerCallSuit: Suit | null = null;
+  /** Signal du partenaire via défausse : couleur refusée (appel indirect par As/10). */
+  private partnerDeniedSuit: Suit | null = null;
 
   constructor(ownSeat: Seat) {
     this.ownSeat = ownSeat;
@@ -73,15 +77,16 @@ export class CardTracker {
         // Inférence : si on demande une couleur et le joueur n'en pose pas, il est void.
         if (this.currentTrickLed && event.card.suit !== this.currentTrickLed) {
           this.voids[event.seat].add(this.currentTrickLed);
-          // Sur-coupe : si atout demandé et joueur défausse, void d'atout.
-          // Si non-atout demandé et joueur défausse hors-atout (pas coupe), void couleur ET pas d'atout.
-          if (this.trump && event.card.suit !== this.trump) {
-            // défausse hors atout sans couper alors qu'il y avait au moins un adversaire pas maître
-            // → on n'avait pas d'atout (ou le partenaire était maître).
-            // Inférence partielle : marquons potentiellement void atout, conservatif :
-            // Si partenaire pas maître (logique externe), on saurait. Ici on est conservatif et
-            // on considère que défausse = peut-être void atout. On ne marque PAS void atout sauf si
-            // on est sûr — la logique IA peut utiliser cette indication probabiliste plus tard.
+          // Convention de défausse : noter le signal du partenaire si défausse hors-atout.
+          if (this.trump && event.card.suit !== this.trump && event.seat === partner(this.ownSeat)) {
+            // Petite carte (7/8/9) = appel direct (joue cette couleur)
+            // Carte forte (A/10) = appel indirect (n'aime pas, joue autre)
+            if (event.card.rank === '7' || event.card.rank === '8' || event.card.rank === '9') {
+              this.partnerCallSuit = event.card.suit;
+              this.partnerDeniedSuit = null;
+            } else if (event.card.rank === 'A' || event.card.rank === '10') {
+              this.partnerDeniedSuit = event.card.suit;
+            }
           }
         }
         // Si entame, on note la couleur du pli courant.
@@ -162,6 +167,11 @@ export class CardTracker {
     return partner(this.ownSeat);
   }
 
+  /** Signaux de défausse du partenaire (appel direct/indirect). */
+  partnerSignals(): { calledSuit: Suit | null; deniedSuit: Suit | null } {
+    return { calledSuit: this.partnerCallSuit, deniedSuit: this.partnerDeniedSuit };
+  }
+
   private reset(): void {
     this.ownHand = [];
     this.playedCards.clear();
@@ -173,5 +183,7 @@ export class CardTracker {
     this.tookFaceUp = false;
     this.currentTrickLed = null;
     this.bidHistory = [];
+    this.partnerCallSuit = null;
+    this.partnerDeniedSuit = null;
   }
 }

@@ -125,42 +125,6 @@
       </ul>
     </section>
 
-    <section>
-      <h3>Conventions testées sans gain net (≈ baseline)</h3>
-      <p>
-        Tournoi 100 parties × 6 variantes (cf <code>scripts/compare-strategies.ts</code>) :
-      </p>
-      <ul>
-        <li><em>Réception appel direct</em> (interpréter petite entame partenaire) : 47%</li>
-        <li><em>Sous l'as, le valet</em> (signaler R+D non-atout) : 47%</li>
-        <li><em>Preneur tire atout long</em> (≥ 5 atouts, sortir 9 ou A) : 46%</li>
-        <li><em>Couper économique</em> (renforce préférence carte basse) : 47%</li>
-        <li><em>Garde-coupe</em> (éviter rejeter une couleur déjà coupée) : 48%</li>
-        <li><em>Tout combiné</em> : 47%</li>
-      </ul>
-      <p class="hint">
-        Conclusion : un signal n'apporte du gain que si <strong>les deux partenaires</strong>
-        l'interprètent de manière cohérente. Émettre seul révèle de l'information à l'adversaire.
-        Code conservé dans <code>src/ai/level4-improved.ts</code> pour itération.
-      </p>
-    </section>
-
-    <section>
-      <h3>Architecture</h3>
-      <ul>
-        <li><strong>core/</strong> règles pures (testées 100% via Vitest + property tests).</li>
-        <li><strong>ai/</strong> niveaux 1-5 implémentant l'interface <code>AIPlayer</code>.</li>
-        <li>
-          <strong>workers/</strong> exécution IA niveau 4-5 en Web Worker (Comlink) pour ne
-          jamais bloquer l'UI.
-        </li>
-        <li>
-          <strong>persistance</strong> localStorage versionné Zod, RNG seedé Mulberry32 pour
-          reproductibilité.
-        </li>
-      </ul>
-    </section>
-
     <footer>
       <button class="primary" onclick={onClose}>Fermer</button>
     </footer>
@@ -225,11 +189,6 @@
     font-size: 13px;
     line-height: 1.5;
     margin: 4px 0;
-  }
-  p.hint {
-    color: #94a3b8;
-    font-size: 12px;
-    font-style: italic;
   }
   code {
     background: rgba(255, 255, 255, 0.08);
