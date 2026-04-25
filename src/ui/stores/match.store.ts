@@ -1,7 +1,7 @@
 // Store global Svelte (runes) du match en cours.
 // Pilote l'orchestrateur, expose l'état réactif au reste de l'UI.
 import type { Bid, Card, DealResult, DealState, MatchState, Seat } from '@core/types';
-import { createMatch, DEFAULT_SETTINGS, applyDealResult } from '@core/match';
+import { createMatch, applyDealResult } from '@core/match';
 import { startDeal } from '@core/game-state';
 import { createRng, randomSeed } from '@core/rng';
 import type { AIConfig, AIPlayer } from '@ai/types';
@@ -9,32 +9,17 @@ import { createAI } from '@ai/registry';
 import { createWorkerAI } from '@/workers/ai.client';
 import { Orchestrator } from '../orchestrator';
 import { debugStore } from './debug.store';
+import { settingsStore } from './settings.store';
 
-/** Bascule globale : utiliser le worker pour les IA niveau 5 (et 4 par sécurité).
- *  Pour 1-3, exécution main thread (rapide, évite ping-pong inutile). */
 function useWorkerForLevel(level: AIConfig['level']): boolean {
   return level >= 4;
 }
-
-interface PlayerSetup {
-  /** Sièges humains (0 ou 1 en pratique). */
-  humans: Seat[];
-  /** Niveau d'IA pour chaque siège non-humain. */
-  aiLevels: Partial<Record<Seat, AIConfig['level']>>;
-}
-
-const DEFAULT_SETUP: PlayerSetup = {
-  humans: ['S'],
-  aiLevels: { N: 2, E: 2, W: 2 },
-};
 
 interface UiState {
   match: MatchState;
   deal: DealState;
   dealSeed: number;
-  setup: PlayerSetup;
   awaitingHuman: Seat | null;
-  paceMs: number;
 }
 
 function deriveDealSeed(matchSeed: number, dealIndex: number): number {
@@ -47,28 +32,41 @@ function makeStore() {
   let orch: Orchestrator | null = null;
   let aisDispose: AIPlayer[] = [];
 
-  function initial(): UiState {
-    const seed = randomSeed();
-    const match = createMatch(DEFAULT_SETTINGS, seed);
-    const dealSeed = deriveDealSeed(seed, 0);
-    const deal = startDeal(dealSeed, match.currentDealer);
+  function settingsToMatchSettings() {
+    const s = settingsStore.value;
     return {
-      match,
-      deal,
-      dealSeed,
-      setup: DEFAULT_SETUP,
-      awaitingHuman: null,
-      paceMs: 700,
-    };
+      endMode: s.endMode,
+      targetPoints: s.targetPoints,
+      targetDeals: s.targetDeals,
+      beloteEnabled: s.beloteEnabled,
+    } as const;
   }
 
-  function buildAis(setup: PlayerSetup, baseSeed: number): Partial<Record<Seat, AIPlayer>> {
+  function initial(): UiState {
+    const seed = randomSeed();
+    const ms = settingsStore.value;
+    const match = createMatch(
+      {
+        endMode: ms.endMode,
+        targetPoints: ms.targetPoints,
+        targetDeals: ms.targetDeals,
+        beloteEnabled: ms.beloteEnabled,
+      },
+      seed,
+    );
+    const dealSeed = deriveDealSeed(seed, 0);
+    const deal = startDeal(dealSeed, match.currentDealer);
+    return { match, deal, dealSeed, awaitingHuman: null };
+  }
+
+  function buildAis(baseSeed: number): Partial<Record<Seat, AIPlayer>> {
     const ais: Partial<Record<Seat, AIPlayer>> = {};
     aisDispose.forEach((a) => a.dispose());
     aisDispose = [];
+    const settings = settingsStore.value;
     for (const seat of ['N', 'E', 'S', 'W'] as const) {
-      if (setup.humans.includes(seat)) continue;
-      const level = setup.aiLevels[seat] ?? 2;
+      if (settings.humans.includes(seat)) continue;
+      const level = settings.aiLevels[seat] ?? 4;
       const cfg: AIConfig = { level, seed: baseSeed + seat.charCodeAt(0) };
       const ai = useWorkerForLevel(level) ? createWorkerAI(seat, cfg) : createAI(seat, cfg);
       ais[seat] = ai;
@@ -79,9 +77,9 @@ function makeStore() {
 
   function startOrchestrator(): void {
     orch?.abort();
-    const ais = buildAis(state.setup, state.dealSeed);
+    const ais = buildAis(state.dealSeed);
     orch = new Orchestrator(state.deal, { ais }, {
-      paceMs: state.paceMs,
+      paceMs: settingsStore.value.paceMs,
       onEvent: (_ev, _before, after) => {
         state.deal = after;
       },
@@ -99,7 +97,14 @@ function makeStore() {
         nextDeal();
       },
       onAiReasoning: (seat, kind, reasoning, card, bid) => {
-        debugStore.push({ ts: Date.now(), seat, kind, reasoning, ...(card ? { card } : {}), ...(bid ? { bid } : {}) });
+        debugStore.push({
+          ts: Date.now(),
+          seat,
+          kind,
+          reasoning,
+          ...(card ? { card } : {}),
+          ...(bid ? { bid } : {}),
+        });
       },
     });
     void orch.run();
@@ -107,17 +112,11 @@ function makeStore() {
 
   function newMatch(seed: number = randomSeed()): void {
     orch?.abort();
-    const match = createMatch(DEFAULT_SETTINGS, seed);
+    const match = createMatch(settingsToMatchSettings(), seed);
     const dealSeed = deriveDealSeed(seed, 0);
     const deal = startDeal(dealSeed, match.currentDealer);
-    state = {
-      match,
-      deal,
-      dealSeed,
-      setup: state.setup,
-      awaitingHuman: null,
-      paceMs: state.paceMs,
-    };
+    state = { match, deal, dealSeed, awaitingHuman: null };
+    debugStore.clear();
     startOrchestrator();
   }
 
@@ -145,16 +144,6 @@ function makeStore() {
     orch.submitHumanAction({ type: 'play', seat, card });
   }
 
-  function setSetup(setup: PlayerSetup): void {
-    state.setup = setup;
-    newMatch(state.match.seed);
-  }
-
-  function setPace(ms: number): void {
-    state.paceMs = ms;
-  }
-
-  // Démarre l'orchestrateur sur l'état initial.
   startOrchestrator();
 
   return {
@@ -165,8 +154,6 @@ function makeStore() {
     nextDeal,
     submitHumanBid,
     submitHumanPlay,
-    setSetup,
-    setPace,
   };
 }
 
