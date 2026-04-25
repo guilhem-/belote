@@ -5,11 +5,13 @@
   import Table from '../components/Table.svelte';
   import Scoreboard from '../components/Scoreboard.svelte';
   import SettingsPanel from '../components/SettingsPanel.svelte';
+  import AboutPanel from '../components/AboutPanel.svelte';
   import ReasoningPanel from '../components/debug/ReasoningPanel.svelte';
   import { SEAT_SHORT as seatShort } from '@i18n/notation';
   import type { Bid, Card, Seat } from '@core/types';
 
   let settingsOpen = $state(false);
+  let aboutOpen = $state(false);
 
   const humanSeats = $derived(settingsStore.value.humans);
   const revealedSeats = $derived(
@@ -82,6 +84,7 @@
     <h1>Belote</h1>
     <Scoreboard match={matchStore.value.match} />
     <div class="topbar-actions">
+      <button onclick={() => (aboutOpen = true)}>À propos</button>
       <button onclick={() => (settingsOpen = true)}>Paramètres</button>
       <button onclick={() => debugStore.toggle()}
         >{debugStore.visible ? 'Masquer debug' : 'Voir pensées IA'}</button
@@ -138,6 +141,9 @@
   <ReasoningPanel />
   {#if settingsOpen}
     <SettingsPanel onApply={applySettings} onClose={() => (settingsOpen = false)} />
+  {/if}
+  {#if aboutOpen}
+    <AboutPanel onClose={() => (aboutOpen = false)} />
   {/if}
 </div>
 

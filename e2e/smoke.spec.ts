@@ -19,9 +19,20 @@ test.describe('smoke — chargement initial', () => {
 
   test('la barre supérieure expose les actions principales', async ({ page }) => {
     await page.goto('/');
+    await expect(page.getByRole('button', { name: 'À propos' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Paramètres' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Voir pensées IA|Masquer debug/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Nouvelle partie' })).toBeVisible();
+  });
+
+  test('le panneau À propos s’ouvre et liste les niveaux', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'À propos' }).click();
+    await expect(page.getByRole('dialog', { name: 'À propos' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Niveau 1/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Niveau 5/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Fermer' }).first().click();
+    await expect(page.getByRole('dialog', { name: 'À propos' })).not.toBeVisible();
   });
 
   test('le scoreboard est présent à 0/0', async ({ page }) => {
