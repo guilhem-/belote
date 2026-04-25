@@ -19,7 +19,8 @@
       </div>
     </header>
     <ol class="entries">
-      {#each [...debugStore.entries].reverse() as e (e.ts)}
+      <li class="meta">{debugStore.entries.length} décisions enregistrées</li>
+      {#each [...debugStore.entries].reverse() as e, idx (idx + '-' + e.ts + '-' + e.seat)}
         <li>
           <div class="head">
             <span class="seat">{e.seat}</span>
@@ -110,6 +111,12 @@
     background: rgba(30, 41, 59, 0.6);
     border-radius: 6px;
     padding: 6px 8px;
+  }
+  .entries > li.meta {
+    background: transparent;
+    color: #94a3b8;
+    font-size: 11px;
+    padding: 2px 0;
   }
   .head {
     display: flex;

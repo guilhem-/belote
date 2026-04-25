@@ -8,13 +8,15 @@
 
   interface Props {
     deal: DealState;
-    /** Sièges contrôlés par un humain — leurs cartes sont visibles. En mode 4-humains, tous. */
+    /** Sièges contrôlés par un humain (donc cartes visibles + interactives). */
     humanSeats: readonly Seat[];
+    /** Sièges dont les cartes sont visibles (debug). N'autorise PAS l'interaction. */
+    revealedSeats: readonly Seat[];
     onBid: (seat: Seat, bid: Bid) => void;
     onPlay: (seat: Seat, card: Card) => void;
   }
 
-  const { deal, humanSeats, onBid, onPlay }: Props = $props();
+  const { deal, humanSeats, revealedSeats, onBid, onPlay }: Props = $props();
 
   const phase = $derived(deal.phase);
   const acting = $derived.by(() => {
@@ -31,6 +33,9 @@
   function isHuman(s: Seat): boolean {
     return humanSeats.includes(s);
   }
+  function isRevealed(s: Seat): boolean {
+    return humanSeats.includes(s) || revealedSeats.includes(s);
+  }
 </script>
 
 <div class="table-grid">
@@ -39,7 +44,7 @@
     <Hand
       cards={deal.hands.N}
       seat="N"
-      facedown={!isHuman('N')}
+      facedown={!isRevealed('N')}
       legalCards={acting === 'N' ? legalForActing : undefined}
       canPlay={phase.kind === 'playing' && acting === 'N' && isHuman('N')}
       onPlay={(c) => onPlay('N', c)}
@@ -50,7 +55,7 @@
     <Hand
       cards={deal.hands.W}
       seat="W"
-      facedown={!isHuman('W')}
+      facedown={!isRevealed('W')}
       legalCards={acting === 'W' ? legalForActing : undefined}
       canPlay={phase.kind === 'playing' && acting === 'W' && isHuman('W')}
       onPlay={(c) => onPlay('W', c)}
@@ -83,7 +88,7 @@
     <Hand
       cards={deal.hands.E}
       seat="E"
-      facedown={!isHuman('E')}
+      facedown={!isRevealed('E')}
       legalCards={acting === 'E' ? legalForActing : undefined}
       canPlay={phase.kind === 'playing' && acting === 'E' && isHuman('E')}
       onPlay={(c) => onPlay('E', c)}
@@ -94,7 +99,7 @@
     <Hand
       cards={deal.hands.S}
       seat="S"
-      facedown={!isHuman('S')}
+      facedown={!isRevealed('S')}
       legalCards={acting === 'S' ? legalForActing : undefined}
       canPlay={phase.kind === 'playing' && acting === 'S' && isHuman('S')}
       onPlay={(c) => onPlay('S', c)}

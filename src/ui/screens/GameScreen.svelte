@@ -10,7 +10,8 @@
 
   let settingsOpen = $state(false);
 
-  const humanSeats = $derived(
+  const humanSeats = $derived(settingsStore.value.humans);
+  const revealedSeats = $derived(
     debugStore.revealHands ? (['N', 'E', 'S', 'W'] as Seat[]) : settingsStore.value.humans,
   );
 
@@ -36,7 +37,7 @@
   }
 </script>
 
-<div class="screen">
+<div class="screen" class:with-debug={debugStore.visible}>
   <header class="topbar">
     <h1>Belote</h1>
     <Scoreboard match={matchStore.value.match} />
@@ -53,7 +54,7 @@
   </header>
 
   <main class="main">
-    <Table deal={matchStore.value.deal} {humanSeats} {onBid} {onPlay} />
+    <Table deal={matchStore.value.deal} {humanSeats} {revealedSeats} {onBid} {onPlay} />
   </main>
 
   <footer class="footer">
@@ -77,6 +78,12 @@
     flex-direction: column;
     gap: 12px;
     min-height: 100vh;
+    transition: padding-right 200ms ease;
+  }
+  .screen.with-debug {
+    max-width: none;
+    margin: 0;
+    padding-right: 400px;
   }
   .topbar {
     display: flex;

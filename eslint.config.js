@@ -38,6 +38,6 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.svelte-kit/**'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.svelte-kit/**', 'playwright-report/**', 'test-results/**'],
   },
 ];
