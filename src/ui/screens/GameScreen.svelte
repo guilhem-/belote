@@ -1,10 +1,14 @@
 <script lang="ts">
   import { matchStore } from '../stores/match.store';
+  import { debugStore } from '../stores/debug.store';
   import Table from '../components/Table.svelte';
   import Scoreboard from '../components/Scoreboard.svelte';
+  import ReasoningPanel from '../components/debug/ReasoningPanel.svelte';
   import type { Bid, Card, Seat } from '@core/types';
 
-  const humanSeats = $derived(matchStore.value.setup.humans);
+  const humanSeats = $derived(
+    debugStore.revealHands ? (['N', 'E', 'S', 'W'] as Seat[]) : matchStore.value.setup.humans,
+  );
 
   function onBid(seat: Seat, bid: Bid): void {
     matchStore.submitHumanBid(seat, bid);
@@ -29,6 +33,7 @@
     <h1>Belote</h1>
     <Scoreboard match={matchStore.value.match} />
     <div class="topbar-actions">
+      <button onclick={() => debugStore.toggle()}>{debugStore.visible ? 'Masquer debug' : 'Voir pensées IA'}</button>
       <button onclick={newMatch}>Nouvelle partie</button>
       {#if matchStore.value.deal.phase.kind === 'scored' && !matchStore.value.match.finished}
         <button class="primary" onclick={nextDeal}>Donne suivante</button>
@@ -44,6 +49,8 @@
     <span>Seed donne : 0x{matchStore.value.dealSeed.toString(16)}</span>
     <span>Donneur : {matchStore.value.deal.dealer}</span>
   </footer>
+
+  <ReasoningPanel />
 </div>
 
 <style>

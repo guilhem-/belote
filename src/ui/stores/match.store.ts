@@ -8,6 +8,7 @@ import type { AIConfig, AIPlayer } from '@ai/types';
 import { createAI } from '@ai/registry';
 import { createWorkerAI } from '@/workers/ai.client';
 import { Orchestrator } from '../orchestrator';
+import { debugStore } from './debug.store';
 
 /** Bascule globale : utiliser le worker pour les IA niveau 5 (et 4 par sécurité).
  *  Pour 1-3, exécution main thread (rapide, évite ping-pong inutile). */
@@ -96,6 +97,9 @@ function makeStore() {
       },
       onRedeal: () => {
         nextDeal();
+      },
+      onAiReasoning: (seat, kind, reasoning, card, bid) => {
+        debugStore.push({ ts: Date.now(), seat, kind, reasoning, ...(card ? { card } : {}), ...(bid ? { bid } : {}) });
       },
     });
     void orch.run();

@@ -2,7 +2,7 @@
 // Ne touche pas au DOM — communique via callbacks.
 
 import type { Bid, Card, DealState, Seat } from '@core/types';
-import type { AIPlayer, ObservableEvent } from '@ai/types';
+import type { AIPlayer, BidReasoning, ObservableEvent, PlayReasoning } from '@ai/types';
 import { apply, expectedToPlay, RedealRequired, type GameEvent, whoActs } from '@core/game-state';
 import { legalBids } from '@core/bidding';
 import { legalMoves } from '@core/rules/legal-moves';
@@ -18,6 +18,8 @@ export interface OrchestratorCallbacks {
   onRedeal?: () => void;
   /** Délai entre coups IA (cadence). */
   paceMs?: number;
+  /** Capture le Reasoning de chaque décision IA pour le panneau debug. */
+  onAiReasoning?: (seat: Seat, kind: 'bid' | 'play', reasoning: BidReasoning | PlayReasoning, card?: Card, bid?: Bid) => void;
 }
 
 export interface PlayerSetup {
@@ -81,6 +83,7 @@ export class Orchestrator {
       const beforePhase = this.state.phase;
       const allowed = legalBids(this.state.phase.phase);
       const decision = await ai.chooseBid(redactState(this.state, seat), allowed);
+      this.cb.onAiReasoning?.(seat, 'bid', decision.reasoning, undefined, decision.bid);
       await this.delay();
       this.applyEvent({ type: 'bid', seat, bid: decision.bid });
       this.broadcast({ type: 'bid', seat, bid: decision.bid });
@@ -99,6 +102,7 @@ export class Orchestrator {
     } else if (this.state.phase.kind === 'playing') {
       const legal = legalMoves(this.state.hands[seat], this.state.phase.current, this.state.phase.trump, seat);
       const decision = await ai.chooseCard(redactState(this.state, seat), legal);
+      this.cb.onAiReasoning?.(seat, 'play', decision.reasoning, decision.card);
       await this.delay();
       const event: GameEvent =
         decision.announceBelote === true
