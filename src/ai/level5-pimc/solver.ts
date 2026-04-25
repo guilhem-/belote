@@ -1,27 +1,42 @@
 // Alpha-beta véritable sur monde à information complète.
-// Maximise les points de l'équipe `ownTeam` à la fin de la donne.
-// - Vraies coupures alpha/beta propagées (pas min-max).
-// - Transposition table par état (hands restantes encodées en bitmask).
-// - Move ordering pour maximiser les coupures.
+// Maximise le score de donne (et non les points cartes bruts) du point de vue de ownTeam :
+// la falaise à 82 (taker tient vs dedans) est le facteur dominant en Belote — un coup qui
+// fait passer le preneur de 81 à 82 vaut bien plus qu'un point brut.
+//
+// - Vraies coupures alpha/beta propagées.
+// - Transposition table par état (uniquement quand pli courant vide).
+// - Move ordering différencié pour favoriser les cutoffs.
+// - Belote/rebelote prise en compte si elle est connue (couple R+D atout chez un joueur).
 
 import type { Card, Hands, PlayedCard, Seat, Suit, Trick } from '@core/types';
 import { SEAT_TEAM, nextSeat, sameCard } from '@core/types';
 import { legalMoves } from '@core/rules/legal-moves';
 import { masterIndex, masterSeat } from '@core/rules/trick';
 import { cardPoints, cardStrength } from '@core/rules/ordering';
-import { DIX_DE_DER, TOTAL_DEAL_POINTS } from '@core/rules/constants';
+import {
+  BELOTE_BONUS,
+  CAPOT_BONUS,
+  DIX_DE_DER,
+  TOTAL_DEAL_POINTS,
+} from '@core/rules/constants';
 
 export interface SolverState {
   hands: Hands;
   currentTrick: Trick;
   trump: Suit;
+  takerTeam: 'NS' | 'EW';
   pointsNS: number;
   pointsEW: number;
-  tricksRemaining: number; // plis encore à jouer (incluant le pli courant)
+  /** Plis remportés par chaque équipe (pour détecter capot). */
+  tricksNS: number;
+  tricksEW: number;
+  tricksRemaining: number;
+  /** Belote dans la donne : équipe ayant R+D atout (si connu côté ownSeat). */
+  beloteTeam: 'NS' | 'EW' | null;
 }
 
 export interface SolverResult {
-  /** Points cartes finaux pour l'équipe ownTeam (0..162). */
+  /** Score de donne final pour l'équipe ownTeam (peut atteindre 282 si capot+belote). */
   scoreOwn: number;
   bestCard: Card | null;
 }
@@ -54,18 +69,17 @@ function alphabeta(
 ): { score: number; card: Card | null } {
   ctx.nodes++;
 
-  const totalCardsLeft = state.hands.N.length + state.hands.E.length + state.hands.S.length + state.hands.W.length;
+  const totalCardsLeft =
+    state.hands.N.length + state.hands.E.length + state.hands.S.length + state.hands.W.length;
+
   if (totalCardsLeft === 0) {
-    const own = ctx.ownTeam === 'NS' ? state.pointsNS : state.pointsEW;
-    return { score: own, card: null };
+    return { score: dealScoreOwn(state, ctx.ownTeam), card: null };
   }
 
-  // Budget temps : si dépassé, on retombe sur une heuristique plus fine que 50/50.
   if ((ctx.nodes & 1023) === 0 && Date.now() > ctx.deadline) {
     return { score: heuristicEval(state, ctx.ownTeam), card: null };
   }
 
-  // Transposition table — uniquement quand le pli courant est vide (état "propre").
   let key: string | null = null;
   if (state.currentTrick.cards.length === 0) {
     key = encodeKey(state, ctx.ownSeat);
@@ -75,7 +89,11 @@ function alphabeta(
 
   const seat = expectedSeat(state.currentTrick);
   const isMaximizing = SEAT_TEAM[seat] === ctx.ownTeam;
-  const moves = orderMoves(legalMoves(state.hands[seat], state.currentTrick, state.trump, seat), state, isMaximizing);
+  const moves = orderMoves(
+    legalMoves(state.hands[seat], state.currentTrick, state.trump, seat),
+    state,
+    isMaximizing,
+  );
 
   let bestCard: Card | null = moves[0] ?? null;
   let bestScore = isMaximizing ? -Infinity : Infinity;
@@ -96,13 +114,11 @@ function alphabeta(
       }
       if (bestScore < beta) beta = bestScore;
     }
-    if (alpha >= beta) break; // coupure
+    if (alpha >= beta) break;
     if (Date.now() > ctx.deadline) break;
   }
 
-  if (!isFinite(bestScore)) {
-    bestScore = heuristicEval(state, ctx.ownTeam);
-  }
+  if (!isFinite(bestScore)) bestScore = heuristicEval(state, ctx.ownTeam);
   if (key !== null) ctx.trans.set(key, bestScore);
   return { score: bestScore, card: bestCard };
 }
@@ -135,25 +151,25 @@ function applyMove(state: SolverState, seat: Seat, card: Card): SolverState {
     hands: newHands,
     currentTrick: { leader: winner, cards: [] },
     trump: state.trump,
+    takerTeam: state.takerTeam,
     pointsNS: state.pointsNS + (team === 'NS' ? pts : 0),
     pointsEW: state.pointsEW + (team === 'EW' ? pts : 0),
+    tricksNS: state.tricksNS + (team === 'NS' ? 1 : 0),
+    tricksEW: state.tricksEW + (team === 'EW' ? 1 : 0),
     tricksRemaining: state.tricksRemaining - 1,
+    beloteTeam: state.beloteTeam,
   };
 }
 
 function orderMoves(moves: readonly Card[], state: SolverState, isMaximizing: boolean): Card[] {
-  // En max : essaye les coups les plus payants d'abord (+pts, +force atout).
-  // En min : on inverse pour favoriser les coupures côté adverse.
   const trick = state.currentTrick;
   const sorted = moves.slice();
-
   if (trick.cards.length === 0) {
     sorted.sort((a, b) => cardStrength(b, state.trump) - cardStrength(a, state.trump));
   } else {
     const partnerSeat = partner(expectedSeat(trick));
     const pMaster = masterSeat(trick, state.trump) === partnerSeat;
     if (pMaster) {
-      // Donner gros (max) ou éviter (min).
       sorted.sort((a, b) => cardPoints(b, state.trump) - cardPoints(a, state.trump));
     } else {
       sorted.sort((a, b) => cardStrength(b, state.trump) - cardStrength(a, state.trump));
@@ -167,8 +183,6 @@ function partner(s: Seat): Seat {
   return s === 'N' ? 'S' : s === 'S' ? 'N' : s === 'E' ? 'W' : 'E';
 }
 
-/** Encodage déterministe pour la table de transposition.
- *  Dépend uniquement de : cartes restantes par siège (triées) + atout + leader courant + ownSeat. */
 function encodeKey(state: SolverState, ownSeat: Seat): string {
   const enc = (cards: readonly Card[]): string =>
     cards
@@ -179,6 +193,7 @@ function encodeKey(state: SolverState, ownSeat: Seat): string {
     state.trump,
     state.currentTrick.leader,
     ownSeat,
+    state.takerTeam,
     enc(state.hands.N),
     enc(state.hands.E),
     enc(state.hands.S),
@@ -186,10 +201,42 @@ function encodeKey(state: SolverState, ownSeat: Seat): string {
   ].join('|');
 }
 
-/** Heuristique d'éval à la coupure : points actuels + estimation des points restants
- *  pondérée par force des atouts en main de chaque équipe. */
+/** Score de donne final selon les règles FFB (cf docs/rules-conventions.md §11). */
+function dealScoreOwn(state: SolverState, ownTeam: 'NS' | 'EW'): number {
+  const takerTeam = state.takerTeam;
+  const defTeam: 'NS' | 'EW' = takerTeam === 'NS' ? 'EW' : 'NS';
+  const takerCard = takerTeam === 'NS' ? state.pointsNS : state.pointsEW;
+  const defCard = takerTeam === 'NS' ? state.pointsEW : state.pointsNS;
+  const takerBelote = state.beloteTeam === takerTeam ? BELOTE_BONUS : 0;
+  const defBelote = state.beloteTeam === defTeam ? BELOTE_BONUS : 0;
+  const takerTricks = takerTeam === 'NS' ? state.tricksNS : state.tricksEW;
+
+  let takerScore = 0;
+  let defScore = 0;
+  if (takerTricks === 8) {
+    takerScore = TOTAL_DEAL_POINTS + CAPOT_BONUS + takerBelote;
+    defScore = defBelote;
+  } else if (state.tricksNS + state.tricksEW === 8 && takerTricks === 0) {
+    takerScore = takerBelote;
+    defScore = TOTAL_DEAL_POINTS + CAPOT_BONUS + defBelote;
+  } else {
+    const takerTotal = takerCard + takerBelote;
+    const defTotal = defCard + defBelote;
+    if (takerTotal > defTotal) {
+      takerScore = takerTotal;
+      defScore = defTotal;
+    } else {
+      takerScore = takerBelote;
+      defScore = TOTAL_DEAL_POINTS + defBelote;
+    }
+  }
+
+  return ownTeam === takerTeam ? takerScore : defScore;
+}
+
+/** Heuristique d'éval à coupure : projection du score de donne basée sur les points
+ *  déjà acquis + estimation de répartition des points restants pondérée par force atouts. */
 function heuristicEval(state: SolverState, ownTeam: 'NS' | 'EW'): number {
-  const own = ownTeam === 'NS' ? state.pointsNS : state.pointsEW;
   const remainingCards: Card[] = [
     ...state.hands.N,
     ...state.hands.E,
@@ -199,26 +246,40 @@ function heuristicEval(state: SolverState, ownTeam: 'NS' | 'EW'): number {
   let remainingPts = state.tricksRemaining > 0 ? DIX_DE_DER : 0;
   for (const c of remainingCards) remainingPts += cardPoints(c, state.trump);
 
-  // Estime la part de l'équipe own : ratio (force atouts own / total force atouts).
-  const ownSeats: Seat[] = ownTeam === 'NS' ? ['N', 'S'] : ['E', 'W'];
-  const oppSeats: Seat[] = ownTeam === 'NS' ? ['E', 'W'] : ['N', 'S'];
-  let ownTrumpStrength = 0;
-  let oppTrumpStrength = 0;
-  for (const s of ownSeats) {
+  const takerSeats: Seat[] = state.takerTeam === 'NS' ? ['N', 'S'] : ['E', 'W'];
+  let takerTrumpStrength = 0;
+  let defTrumpStrength = 0;
+  for (const s of takerSeats) {
     for (const c of state.hands[s]) {
-      if (c.suit === state.trump) ownTrumpStrength += cardStrength(c, state.trump) + 1;
+      if (c.suit === state.trump) takerTrumpStrength += cardStrength(c, state.trump) + 1;
     }
   }
-  for (const s of oppSeats) {
+  for (const s of (['N', 'E', 'S', 'W'] as Seat[]).filter((x) => !takerSeats.includes(x))) {
     for (const c of state.hands[s]) {
-      if (c.suit === state.trump) oppTrumpStrength += cardStrength(c, state.trump) + 1;
+      if (c.suit === state.trump) defTrumpStrength += cardStrength(c, state.trump) + 1;
     }
   }
-  const totalTrump = ownTrumpStrength + oppTrumpStrength;
-  const ratio = totalTrump > 0 ? ownTrumpStrength / totalTrump : 0.5;
-  // Lissage vers 0.5 : on n'extrapole pas trop.
-  const blended = 0.4 + 0.2 * (ratio - 0.5) * 2; // entre ~0.3 et ~0.5
-  const estim = own + remainingPts * blended;
-  // Borne supérieure : on ne peut jamais dépasser 162 points cartes.
-  return Math.min(estim, TOTAL_DEAL_POINTS);
+  const totalTrump = takerTrumpStrength + defTrumpStrength;
+  // Le preneur garde l'initiative à l'atout : biais 0.55 vers preneur si force égale.
+  const takerRatio = totalTrump > 0 ? 0.55 + 0.4 * (takerTrumpStrength / totalTrump - 0.5) : 0.55;
+  const takerEstimateCard =
+    (state.takerTeam === 'NS' ? state.pointsNS : state.pointsEW) + remainingPts * takerRatio;
+
+  // Projection du score de donne à partir de cette estim.
+  const takerBelote = state.beloteTeam === state.takerTeam ? BELOTE_BONUS : 0;
+  const defTeam: 'NS' | 'EW' = state.takerTeam === 'NS' ? 'EW' : 'NS';
+  const defBelote = state.beloteTeam === defTeam ? BELOTE_BONUS : 0;
+  const takerTotal = takerEstimateCard + takerBelote;
+  const defTotal = TOTAL_DEAL_POINTS - takerEstimateCard + defBelote;
+
+  let takerScore: number;
+  let defScore: number;
+  if (takerTotal > defTotal) {
+    takerScore = takerTotal;
+    defScore = defTotal;
+  } else {
+    takerScore = takerBelote;
+    defScore = TOTAL_DEAL_POINTS + defBelote;
+  }
+  return ownTeam === state.takerTeam ? takerScore : defScore;
 }

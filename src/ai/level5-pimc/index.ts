@@ -22,9 +22,9 @@ import { createLevel4AI } from '../level4-deductive';
 
 const DEFAULT_TIME_BUDGET_MS = 1500;
 const DEFAULT_K_MIN = 6;
-const DEFAULT_K_MAX = 40;
+const DEFAULT_K_MAX = 50;
 const TIE_THRESHOLD = 12; // écart score level4 jugé "ex aequo"
-const MIN_WORLDS_FOR_TRUST = 4; // si moins, on fait confiance à level4
+const MIN_WORLDS_FOR_TRUST = 4;
 
 export function createLevel5AI(seat: Seat, config: AIConfig): AIPlayer {
   const rng: Rng = createRng(config.seed);
@@ -77,6 +77,27 @@ export function createLevel5AI(seat: Seat, config: AIConfig): AIPlayer {
         };
       }
       const trumpEff = state.phase.trump;
+      const takerTeam: 'NS' | 'EW' = SEAT_TEAM[state.phase.taker];
+      // Belote connue côté nous : si on tient R+Q atout, c'est notre équipe.
+      // Sinon on suppose null (information bayésienne — non implémenté ici).
+      const ownHas =
+        state.hands[seat].some((c) => c.suit === trumpEff && c.rank === 'K') &&
+        state.hands[seat].some((c) => c.suit === trumpEff && c.rank === 'Q');
+      const beloteTeam: 'NS' | 'EW' | null = ownHas ? SEAT_TEAM[seat] : null;
+      // Plis déjà remportés.
+      let tricksNS = 0;
+      let tricksEW = 0;
+      for (const t of state.phase.tricks) {
+        if (SEAT_TEAM[t.winner] === 'NS') tricksNS++;
+        else tricksEW++;
+      }
+      // Points cartes par équipe déjà accumulés.
+      let pointsNS = 0;
+      let pointsEW = 0;
+      for (const t of state.phase.tricks) {
+        if (SEAT_TEAM[t.winner] === 'NS') pointsNS += t.points;
+        else pointsEW += t.points;
+      }
 
       // 1) Décision level4 = baseline garantie.
       const baseDecision = await fallback.chooseCard(state, legal);
@@ -137,9 +158,13 @@ export function createLevel5AI(seat: Seat, config: AIConfig): AIPlayer {
             hands: after.hands,
             currentTrick: after.trick,
             trump: trumpEff,
-            pointsNS: after.pointsNS,
-            pointsEW: after.pointsEW,
+            takerTeam,
+            pointsNS,
+            pointsEW,
+            tricksNS,
+            tricksEW,
             tricksRemaining: remaining,
+            beloteTeam,
           };
           // Budget par carte : reste équitablement réparti sur le reste des mondes×cartes.
           const remainingCards = shortlist.length;
@@ -181,7 +206,11 @@ export function createLevel5AI(seat: Seat, config: AIConfig): AIPlayer {
         };
       }
 
-      // 6) Choix par espérance PIMC (toutes les cartes ont vu le même nombre de mondes).
+      // 6) Score combiné : level4 (poids 0.7) + PIMC (poids 0.3, normalisé).
+      //    PIMC seul est trop bruité pour battre level4 systématiquement, donc on biaise
+      //    fortement vers level4 mais on laisse PIMC corriger les vrais ties.
+      // Normalisation : level4 score ~ 0-100, PIMC mean ~ 0-282 → on rescale PIMC sur 100
+      // en divisant par 2.82 pour comparer à level4.
       const candidates = shortlist.map((c) => {
         const id = `${c.card.rank}${c.card.suit}`;
         const s = stats.get(id)!;
@@ -189,9 +218,11 @@ export function createLevel5AI(seat: Seat, config: AIConfig): AIPlayer {
         const variance = s.n > 0 ? Math.max(0, s.sumSq / s.n - mean * mean) : 0;
         const stdev = Math.sqrt(variance);
         const winRate = s.n > 0 ? s.wins / s.n : 0;
+        const pimcNormalized = mean / 2.82;
+        const blended = c.score * 0.7 + pimcNormalized * 0.3;
         return {
           card: c.card,
-          score: mean,
+          score: blended,
           rationale: `L4=${c.score.toFixed(1)} | PIMC E=${mean.toFixed(1)} σ=${stdev.toFixed(1)} win=${(winRate * 100).toFixed(0)}%`,
           expectedScore: mean,
           stdev,
@@ -244,6 +275,9 @@ export function createLevel5AI(seat: Seat, config: AIConfig): AIPlayer {
         case 'play':
           belief.notePlay(event.seat, event.card, currentLedSuit ?? null);
           if (currentLedSuit === null) currentLedSuit = event.card.suit;
+          break;
+        case 'belote-announce':
+          if (event.seat === seat) beloteAnnouncedByMe = true;
           break;
         case 'trick-end':
           currentLedSuit = null;

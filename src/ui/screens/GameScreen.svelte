@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { matchStore } from '../stores/match.store';
-  import { debugStore } from '../stores/debug.store';
-  import { settingsStore } from '../stores/settings.store';
+  import { matchStore } from '../stores/match.store.svelte';
+  import { debugStore } from '../stores/debug.store.svelte';
+  import { settingsStore } from '../stores/settings.store.svelte';
   import Table from '../components/Table.svelte';
   import Scoreboard from '../components/Scoreboard.svelte';
   import SettingsPanel from '../components/SettingsPanel.svelte';

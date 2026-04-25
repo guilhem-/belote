@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { debugStore } from '../../stores/debug.store';
+  import { debugStore } from '../../stores/debug.store.svelte';
 
   function fmt(v: unknown): string {
     if (typeof v === 'number') return v.toFixed(1);

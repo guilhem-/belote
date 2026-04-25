@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { settingsStore } from '../stores/settings.store';
+  import { settingsStore } from '../stores/settings.store.svelte';
   import type { Seat } from '@core/types';
   import type { AILevel } from '@ai/types';
 

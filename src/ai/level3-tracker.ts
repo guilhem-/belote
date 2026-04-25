@@ -73,12 +73,10 @@ export function createLevel3AI(seat: Seat, config: AIConfig): AIPlayer {
       const ties = candidates.filter((c) => c.score === top.score);
       const chosen = ties.length > 1 ? ties[Math.floor(rng.next() * ties.length)]! : top;
 
-      // Belote/Rebelote
       let announceBelote = false;
       if (chosen.card.suit === trump && (chosen.card.rank === 'K' || chosen.card.rank === 'Q')) {
         if (!beloteAnnouncedByMe && hasBeloteCombo(state.hands[seat], trump)) {
           announceBelote = true;
-          beloteAnnouncedByMe = true;
         } else if (beloteAnnouncedByMe) {
           const other = chosen.card.rank === 'K' ? 'Q' : 'K';
           if (!state.hands[seat].some((c) => c.suit === trump && c.rank === other)) announceBelote = true;
@@ -106,6 +104,7 @@ export function createLevel3AI(seat: Seat, config: AIConfig): AIPlayer {
     observe(event: ObservableEvent): void {
       tracker.observe(event);
       if (event.type === 'deal-start' || event.type === 'deal-end') beloteAnnouncedByMe = false;
+      else if (event.type === 'belote-announce' && event.seat === seat) beloteAnnouncedByMe = true;
     },
     dispose(): void {},
   };

@@ -73,19 +73,16 @@ export function createLevel2AI(seat: Seat, config: AIConfig): AIPlayer {
       const ties = candidates.filter((c) => c.score === top.score);
       const chosen = ties.length > 1 ? ties[Math.floor(rng.next() * ties.length)]! : top;
 
-      // Belote/Rebelote auto-annoncée.
+      // Belote/Rebelote auto-annoncée. Le flag est synchronisé via observe('belote-announce')
+      // pour ne pas drift quand un wrapper (level5) ignore notre décision.
       let announceBelote = false;
       if (chosen.card.suit === trump && (chosen.card.rank === 'K' || chosen.card.rank === 'Q')) {
         if (!beloteAnnouncedByMe && hasBeloteCombo(state.hands[seat], trump)) {
           announceBelote = true;
-          beloteAnnouncedByMe = true;
         } else if (beloteAnnouncedByMe) {
-          // Rebelote : seulement si la carte qu'on joue est R ou Q et que l'autre n'est plus en main.
           const other = chosen.card.rank === 'K' ? 'Q' : 'K';
           const stillHasOther = state.hands[seat].some((c) => c.suit === trump && c.rank === other);
-          if (!stillHasOther) {
-            announceBelote = true;
-          }
+          if (!stillHasOther) announceBelote = true;
         }
       }
 
@@ -97,9 +94,8 @@ export function createLevel2AI(seat: Seat, config: AIConfig): AIPlayer {
     },
 
     observe(event: ObservableEvent): void {
-      if (event.type === 'deal-end' || event.type === 'deal-start') {
-        beloteAnnouncedByMe = false;
-      }
+      if (event.type === 'deal-end' || event.type === 'deal-start') beloteAnnouncedByMe = false;
+      else if (event.type === 'belote-announce' && event.seat === seat) beloteAnnouncedByMe = true;
     },
     dispose(): void {},
   };

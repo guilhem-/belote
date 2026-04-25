@@ -8,8 +8,8 @@ import type { AIConfig, AIPlayer } from '@ai/types';
 import { createAI } from '@ai/registry';
 import { createWorkerAI } from '@/workers/ai.client';
 import { Orchestrator } from '../orchestrator';
-import { debugStore } from './debug.store';
-import { settingsStore } from './settings.store';
+import { debugStore } from './debug.store.svelte';
+import { settingsStore } from './settings.store.svelte';
 
 function useWorkerForLevel(level: AIConfig['level']): boolean {
   return level >= 4;
