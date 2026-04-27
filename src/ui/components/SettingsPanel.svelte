@@ -161,6 +161,15 @@
           />
           Lancer automatiquement la donne suivante
         </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={settingsStore.value.coachWarnings}
+            onchange={(e) =>
+              settingsStore.set((c) => ({ ...c, coachWarnings: e.currentTarget.checked }))}
+          />
+          Coach : avertir quand un coup humain semble sous-optimal
+        </label>
       </div>
     </section>
 

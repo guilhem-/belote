@@ -7,6 +7,7 @@
   import SettingsPanel from '../components/SettingsPanel.svelte';
   import AboutPanel from '../components/AboutPanel.svelte';
   import Confetti from '../components/Confetti.svelte';
+  import CoachToast from '../components/CoachToast.svelte';
   import ReasoningPanel from '../components/debug/ReasoningPanel.svelte';
   import { SEAT_SHORT as seatShort } from '@i18n/notation';
   import { SEAT_TEAM } from '@core/types';
@@ -159,6 +160,7 @@
   {/if}
 
   <Confetti active={humanWon} />
+  <CoachToast />
 
   <ReasoningPanel />
   {#if settingsOpen}

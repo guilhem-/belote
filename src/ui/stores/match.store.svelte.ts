@@ -12,6 +12,8 @@ import { createWorkerAI } from '@/workers/ai.client';
 import { Orchestrator } from '../orchestrator';
 import { debugStore } from './debug.store.svelte';
 import { settingsStore } from './settings.store.svelte';
+import { coachStore } from './coach.store.svelte';
+import { evaluateHumanPlay } from '../coach';
 
 function useWorkerForLevel(level: AIConfig['level']): boolean {
   return level >= 4;
@@ -44,6 +46,8 @@ function makeStore() {
   let aisDispose: AIPlayer[] = [];
   /** Compteur de redistributions consécutives sur la donne courante. */
   let redealAttempt = 0;
+  /** Coachs IA level4 par siège humain (créés à chaque match) — observent en parallèle. */
+  let coachAIs: Partial<Record<Seat, AIPlayer>> = {};
 
   function settingsToMatchSettings() {
     const s = settingsStore.value;
@@ -95,14 +99,46 @@ function makeStore() {
     return ais;
   }
 
+  function buildCoachAIs(baseSeed: number): void {
+    Object.values(coachAIs).forEach((c) => c?.dispose());
+    coachAIs = {};
+    if (!settingsStore.value.coachWarnings) return;
+    for (const seat of settingsStore.value.humans) {
+      // Coach toujours level4 (heuristique, déterministe, rapide).
+      coachAIs[seat] = createAI(seat, { level: 4, seed: baseSeed + seat.charCodeAt(0) + 999 });
+    }
+  }
+
   function startOrchestrator(): void {
     orch?.abort();
     const ais = buildAis(state.dealSeed);
+    buildCoachAIs(state.dealSeed);
     orch = new Orchestrator(state.deal, { ais }, {
       paceMs: settingsStore.value.paceMs,
       bidPaceMs: settingsStore.value.bidPaceMs,
-      onEvent: (_ev, _before, after) => {
+      onEvent: (ev, _before, after) => {
         state.deal = after;
+        // Forward bid/play à tous les coachs.
+        for (const c of Object.values(coachAIs)) {
+          if (ev.type === 'bid') c?.observe({ type: 'bid', seat: ev.seat, bid: ev.bid });
+          else if (ev.type === 'play') c?.observe({ type: 'play', seat: ev.seat, card: ev.card });
+        }
+        // Si l'enchère vient de se terminer, notifie bidding-end + final-hand aux coachs.
+        if (after.phase.kind === 'playing') {
+          const ph = after.phase;
+          const wasBidding = ev.type === 'bid';
+          if (wasBidding) {
+            for (const [s, c] of Object.entries(coachAIs)) {
+              c?.observe({
+                type: 'bidding-end',
+                taker: ph.taker,
+                trump: ph.trump,
+                tookFaceUp: false,
+              });
+              c?.observe({ type: 'final-hand', ownSeat: s as Seat, ownHand: after.hands[s as Seat] });
+            }
+          }
+        }
       },
       onTrickComplete: (trick) =>
         new Promise<void>((resolve) => {
@@ -187,6 +223,17 @@ function makeStore() {
         });
       },
     });
+
+    // Notifie les coachs du démarrage de la donne (les sièges humains observent leur main).
+    for (const [seat, coach] of Object.entries(coachAIs)) {
+      coach?.observe({
+        type: 'deal-start',
+        dealer: state.deal.dealer,
+        ownSeat: seat as Seat,
+        ownHand: state.deal.hands[seat as Seat],
+        faceUp: state.deal.faceUp,
+      });
+    }
     void orch.run();
   }
 
@@ -244,13 +291,39 @@ function makeStore() {
   function submitHumanBid(seat: Seat, bid: Bid): void {
     if (!orch) return;
     state.awaitingHuman = null;
+    // Notifie les coachs.
+    for (const c of Object.values(coachAIs)) c?.observe({ type: 'bid', seat, bid });
     orch.submitHumanAction({ type: 'bid', seat, bid });
   }
 
-  function submitHumanPlay(seat: Seat, card: Card): void {
+  async function submitHumanPlay(seat: Seat, card: Card): Promise<void> {
     if (!orch) return;
     state.awaitingHuman = null;
     state.pendingHumanCard = null;
+
+    // Évaluation coach (avant de soumettre, sinon le state a déjà avancé).
+    const coach = coachAIs[seat];
+    if (coach && state.deal.phase.kind === 'playing') {
+      const playing = state.deal.phase;
+      const legal = legalMoves(state.deal.hands[seat], playing.current, playing.trump, seat);
+      try {
+        const verdict = await evaluateHumanPlay(coach, state.deal, seat, legal, card);
+        if (verdict) {
+          coachStore.push({
+            ts: Date.now(),
+            seat,
+            played: card,
+            recommended: verdict.recommended,
+            delta: verdict.delta,
+            rationale: verdict.rationale,
+            explanation: verdict.explanation,
+          });
+        }
+      } catch {
+        /* coach silencieux */
+      }
+    }
+
     orch.submitHumanAction({ type: 'play', seat, card });
   }
 

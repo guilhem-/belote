@@ -22,6 +22,9 @@ export const SettingsSchemaV1 = z.object({
   autoPlayLastCard: z.boolean().default(true),
   /** Lance automatiquement la donne suivante quand la précédente se termine. */
   autoNextDeal: z.boolean().default(true),
+  /** Affiche des avertissements quand le joueur humain fait un coup
+   *  sous-optimal d'après l'IA conseil (level4, mêmes informations que l'humain). */
+  coachWarnings: z.boolean().default(false),
 });
 
 export type Settings = z.infer<typeof SettingsSchemaV1>;
@@ -39,4 +42,5 @@ export const DEFAULT_SETTINGS_V1: Settings = {
   trickLayout: 'cross',
   autoPlayLastCard: true,
   autoNextDeal: true,
+  coachWarnings: false,
 };
