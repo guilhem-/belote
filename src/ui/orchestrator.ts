@@ -16,8 +16,10 @@ export interface OrchestratorCallbacks {
   onDealEnd?: (state: DealState) => void;
   /** Appelée si redeal nécessaire. */
   onRedeal?: () => void;
-  /** Délai entre coups IA (cadence). */
+  /** Délai entre coups IA pendant le jeu (cadence du pli). */
   paceMs?: number;
+  /** Délai entre décisions d'enchère IA (généralement plus court). */
+  bidPaceMs?: number;
   /** Capture le Reasoning de chaque décision IA pour le panneau debug. */
   onAiReasoning?: (seat: Seat, kind: 'bid' | 'play', reasoning: BidReasoning | PlayReasoning, card?: Card, bid?: Bid) => void;
   /** Appelé après que le 4e coup a été appliqué. Le callback peut retourner une promesse
@@ -93,7 +95,7 @@ export class Orchestrator {
       const allowed = legalBids(this.state.phase.phase);
       const decision = await ai.chooseBid(redactState(this.state, seat), allowed);
       this.cb.onAiReasoning?.(seat, 'bid', decision.reasoning, undefined, decision.bid);
-      await this.delay();
+      await this.bidDelay();
       this.applyEvent({ type: 'bid', seat, bid: decision.bid });
       this.broadcast({ type: 'bid', seat, bid: decision.bid });
       const newPhase = this.state.phase as DealState['phase'];
@@ -189,6 +191,12 @@ export class Orchestrator {
 
   private delay(): Promise<void> {
     const ms = this.cb.paceMs ?? 0;
+    if (ms <= 0) return Promise.resolve();
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  private bidDelay(): Promise<void> {
+    const ms = this.cb.bidPaceMs ?? 0;
     if (ms <= 0) return Promise.resolve();
     return new Promise((r) => setTimeout(r, ms));
   }

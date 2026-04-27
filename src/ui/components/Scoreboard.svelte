@@ -1,10 +1,12 @@
 <script lang="ts">
-  import type { MatchState } from '@core/types';
+  import type { MatchState, Team } from '@core/types';
 
   interface Props {
     match: MatchState;
   }
   const { match }: Props = $props();
+
+  const TEAM_LABEL: Record<Team, string> = { NS: 'NS', EW: 'EO' };
 </script>
 
 <div class="scoreboard">
@@ -23,8 +25,8 @@
       <div class="winner">
         {#if match.winner === 'draw'}
           Égalité
-        {:else}
-          Vainqueur : <strong>{match.winner}</strong>
+        {:else if match.winner}
+          Vainqueur : <strong>{TEAM_LABEL[match.winner]}</strong>
         {/if}
       </div>
     {/if}

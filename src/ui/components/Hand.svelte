@@ -9,8 +9,13 @@
     facedown?: boolean;
     legalCards?: readonly CardType[] | undefined;
     canPlay?: boolean;
+    /** Permet de cliquer une carte hors-tour pour la pré-sélectionner. */
+    canPreselect?: boolean;
+    /** Carte actuellement pré-sélectionnée (highlight visuel). */
+    pendingCard?: CardType | null;
     trump?: Suit | null;
     onPlay?: ((card: CardType) => void) | undefined;
+    onPreselect?: ((card: CardType) => void) | undefined;
   }
 
   const {
@@ -19,8 +24,11 @@
     facedown = false,
     legalCards,
     canPlay = false,
+    canPreselect = false,
+    pendingCard = null,
     trump = null,
     onPlay,
+    onPreselect,
   }: Props = $props();
 
   // Ordre conventionnel français : atout d'abord, puis ♥ ♣ ♦ ♠ (alternance couleurs).
@@ -43,6 +51,16 @@
     if (!legalCards) return true;
     return legalCards.some((l) => l.suit === c.suit && l.rank === c.rank);
   }
+  function isPending(c: CardType): boolean {
+    return pendingCard != null && pendingCard.suit === c.suit && pendingCard.rank === c.rank;
+  }
+  function handleClick(c: CardType): void {
+    if (canPlay && isLegal(c)) {
+      onPlay?.(c);
+    } else if (canPreselect) {
+      onPreselect?.(c);
+    }
+  }
 </script>
 
 <div class="hand" data-seat={seat}>
@@ -50,9 +68,10 @@
     <Card
       card={c}
       facedown={facedown}
-      selectable={canPlay && isLegal(c)}
+      selectable={(canPlay && isLegal(c)) || canPreselect}
       dimmed={canPlay && !isLegal(c)}
-      onclick={() => onPlay?.(c)}
+      highlighted={isPending(c)}
+      onclick={() => handleClick(c)}
     />
   {/each}
 </div>

@@ -46,14 +46,14 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 56px;
-    height: 80px;
+    width: 64px;
+    height: 92px;
     background: white;
     color: black;
     border: 1.5px solid #1f2937;
     border-radius: 6px;
     font-family: 'Times New Roman', serif;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1;
     padding: 0;
     cursor: default;
@@ -81,10 +81,10 @@
     opacity: 0.45;
   }
   .rank {
-    font-size: 18px;
+    font-size: 24px;
   }
   .suit {
-    font-size: 22px;
-    margin-top: 2px;
+    font-size: 30px;
+    margin-top: 4px;
   }
 </style>

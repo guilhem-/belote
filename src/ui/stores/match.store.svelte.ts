@@ -25,6 +25,9 @@ interface UiState {
   /** Si non-null, on affiche ce pli (4 cartes complétées) au lieu du pli courant
    *  pendant la pause "voir le pli" liée à la cadence. */
   displayedTrick: Trick | null;
+  /** Carte pré-sélectionnée par l'humain (cliquée avant son tour) ; jouée auto quand
+   *  son tour arrive si elle est légale. */
+  pendingHumanCard: { seat: Seat; card: Card } | null;
 }
 
 function deriveDealSeed(matchSeed: number, dealIndex: number, attempt = 0): number {
@@ -66,7 +69,14 @@ function makeStore() {
     );
     const dealSeed = deriveDealSeed(seed, 0);
     const deal = startDeal(dealSeed, match.currentDealer);
-    return { match, deal, dealSeed, awaitingHuman: null, displayedTrick: null };
+    return {
+      match,
+      deal,
+      dealSeed,
+      awaitingHuman: null,
+      displayedTrick: null,
+      pendingHumanCard: null,
+    };
   }
 
   function buildAis(baseSeed: number): Partial<Record<Seat, AIPlayer>> {
@@ -90,6 +100,7 @@ function makeStore() {
     const ais = buildAis(state.dealSeed);
     orch = new Orchestrator(state.deal, { ais }, {
       paceMs: settingsStore.value.paceMs,
+      bidPaceMs: settingsStore.value.bidPaceMs,
       onEvent: (_ev, _before, after) => {
         state.deal = after;
       },
@@ -106,23 +117,42 @@ function makeStore() {
         }),
       onAwaitHuman: (seat) => {
         state.awaitingHuman = seat;
-        // Auto-joue la carte si une seule carte légale et option activée.
-        if (
-          settingsStore.value.autoPlayLastCard &&
-          state.deal.phase.kind === 'playing'
-        ) {
+        if (state.deal.phase.kind === 'playing') {
           const playing = state.deal.phase;
           const legal = legalMoves(state.deal.hands[seat], playing.current, playing.trump, seat);
-          if (legal.length === 1) {
-            const card = legal[0]!;
-            // petit délai pour permettre à l'UI de "voir" le tour arriver
+
+          // Pré-clic : si l'humain a déjà choisi une carte légale, la joue.
+          const pending = state.pendingHumanCard;
+          if (
+            pending &&
+            pending.seat === seat &&
+            legal.some((c) => c.suit === pending.card.suit && c.rank === pending.card.rank)
+          ) {
+            const card = pending.card;
+            state.pendingHumanCard = null;
             setTimeout(() => {
               if (orch && state.awaitingHuman === seat) {
                 state.awaitingHuman = null;
                 try {
                   orch.submitHumanAction({ type: 'play', seat, card });
                 } catch {
-                  /* déjà traité */
+                  /* ignore */
+                }
+              }
+            }, 80);
+            return;
+          }
+
+          // Auto-joue la carte si une seule carte légale et option activée.
+          if (settingsStore.value.autoPlayLastCard && legal.length === 1) {
+            const card = legal[0]!;
+            setTimeout(() => {
+              if (orch && state.awaitingHuman === seat) {
+                state.awaitingHuman = null;
+                try {
+                  orch.submitHumanAction({ type: 'play', seat, card });
+                } catch {
+                  /* ignore */
                 }
               }
             }, 120);
@@ -166,7 +196,14 @@ function makeStore() {
     const match = createMatch(settingsToMatchSettings(), seed);
     const dealSeed = deriveDealSeed(seed, 0);
     const deal = startDeal(dealSeed, match.currentDealer);
-    state = { match, deal, dealSeed, awaitingHuman: null, displayedTrick: null };
+    state = {
+      match,
+      deal,
+      dealSeed,
+      awaitingHuman: null,
+      displayedTrick: null,
+      pendingHumanCard: null,
+    };
     debugStore.clear();
     startOrchestrator();
   }
@@ -213,7 +250,16 @@ function makeStore() {
   function submitHumanPlay(seat: Seat, card: Card): void {
     if (!orch) return;
     state.awaitingHuman = null;
+    state.pendingHumanCard = null;
     orch.submitHumanAction({ type: 'play', seat, card });
+  }
+
+  function preselectHumanCard(seat: Seat, card: Card): void {
+    state.pendingHumanCard = { seat, card };
+  }
+
+  function clearPreselection(): void {
+    state.pendingHumanCard = null;
   }
 
   startOrchestrator();
@@ -226,6 +272,8 @@ function makeStore() {
     nextDeal,
     submitHumanBid,
     submitHumanPlay,
+    preselectHumanCard,
+    clearPreselection,
   };
 }
 

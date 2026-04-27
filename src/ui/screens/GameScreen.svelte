@@ -6,9 +6,11 @@
   import Scoreboard from '../components/Scoreboard.svelte';
   import SettingsPanel from '../components/SettingsPanel.svelte';
   import AboutPanel from '../components/AboutPanel.svelte';
+  import Confetti from '../components/Confetti.svelte';
   import ReasoningPanel from '../components/debug/ReasoningPanel.svelte';
   import { SEAT_SHORT as seatShort } from '@i18n/notation';
-  import type { Bid, Card, Seat } from '@core/types';
+  import { SEAT_TEAM } from '@core/types';
+  import type { Bid, Card, Seat, Team } from '@core/types';
 
   let settingsOpen = $state(false);
   let aboutOpen = $state(false);
@@ -25,6 +27,22 @@
   function onPlay(seat: Seat, card: Card): void {
     matchStore.submitHumanPlay(seat, card);
   }
+
+  function onPreselect(seat: Seat, card: Card): void {
+    matchStore.preselectHumanCard(seat, card);
+  }
+
+  // Confettis si humain a gagné le match (cible de points atteinte).
+  const humanTeams = $derived.by(() => {
+    const teams = new Set<Team>();
+    for (const s of settingsStore.value.humans) teams.add(SEAT_TEAM[s]);
+    return teams;
+  });
+  const humanWon = $derived.by(() => {
+    const m = matchStore.value.match;
+    if (!m.finished || !m.winner || m.winner === 'draw') return false;
+    return humanTeams.has(m.winner);
+  });
 
   function nextDeal(): void {
     matchStore.nextDeal();
@@ -100,11 +118,13 @@
     <Table
       deal={matchStore.value.deal}
       displayedTrick={matchStore.value.displayedTrick}
+      pendingCard={matchStore.value.pendingHumanCard}
       {humanSeats}
       {revealedSeats}
       trickLayout={settingsStore.value.trickLayout}
       {onBid}
       {onPlay}
+      {onPreselect}
     />
   </main>
 
@@ -138,6 +158,8 @@
     <div class="toast" role="status">{seedToast}</div>
   {/if}
 
+  <Confetti active={humanWon} />
+
   <ReasoningPanel />
   {#if settingsOpen}
     <SettingsPanel onApply={applySettings} onClose={() => (settingsOpen = false)} />
@@ -151,17 +173,28 @@
   .screen {
     max-width: 1100px;
     margin: 0 auto;
-    padding: 12px;
+    padding: 8px 12px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
     min-height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
     transition: padding-right 200ms ease;
   }
   .screen.with-debug {
     max-width: none;
     margin: 0;
     padding-right: 400px;
+  }
+  .main {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+  }
+  .main > :global(.table-grid) {
+    flex: 1;
   }
   .topbar {
     display: flex;

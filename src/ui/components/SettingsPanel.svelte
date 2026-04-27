@@ -96,6 +96,22 @@
     </section>
 
     <section>
+      <h3>Cadence des enchères</h3>
+      <label class="custom">
+        Délai par décision d'enchère : {(settingsStore.value.bidPaceMs / 1000).toFixed(1)}s
+        <input
+          type="range"
+          min="100"
+          max="3000"
+          step="100"
+          value={settingsStore.value.bidPaceMs}
+          oninput={(e) =>
+            settingsStore.set((c) => ({ ...c, bidPaceMs: Number(e.currentTarget.value) }))}
+        />
+      </label>
+    </section>
+
+    <section>
       <h3>Fin de partie</h3>
       <label><input type="radio" checked={settingsStore.value.endMode === 'points'} onchange={() => setEndMode('points')} /> Points</label>
       {#if settingsStore.value.endMode === 'points'}

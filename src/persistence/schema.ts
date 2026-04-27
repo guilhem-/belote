@@ -10,6 +10,8 @@ export const SettingsSchemaV1 = z.object({
     W: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional(),
   }),
   paceMs: z.number().int().min(200).max(8000),
+  /** Cadence dédiée à la phase d'enchère (par défaut 1s, plus rapide que paceMs). */
+  bidPaceMs: z.number().int().min(100).max(5000).default(1000),
   endMode: z.enum(['points', 'deals']),
   targetPoints: z.union([z.literal(501), z.literal(1000), z.literal(1501)]),
   targetDeals: z.number().int().min(1).max(50),
@@ -29,6 +31,7 @@ export const DEFAULT_SETTINGS_V1: Settings = {
   humans: ['S'],
   aiLevels: { N: 4, E: 4, W: 4 },
   paceMs: 4000,
+  bidPaceMs: 1000,
   endMode: 'points',
   targetPoints: 501,
   targetDeals: 4,
