@@ -1,8 +1,11 @@
 // Coach : warnings affichés au joueur humain quand il fait un coup sous-optimal
 // par rapport à ce qu'une IA level4 (même information que lui) recommanderait.
-import type { Card, Seat } from '@core/types';
+import type { Bid, Card, Seat } from '@core/types';
 
-export interface CoachWarning {
+export type CoachWarning = CoachPlayWarning | CoachBidWarning;
+
+export interface CoachPlayWarning {
+  kind: 'play';
   ts: number;
   seat: Seat;
   played: Card;
@@ -12,6 +15,17 @@ export interface CoachWarning {
   /** Rationale du coup recommandé (vient du Reasoning level4). */
   rationale: string;
   /** Explication pédagogique générée à partir du contexte. */
+  explanation: string;
+}
+
+export interface CoachBidWarning {
+  kind: 'bid';
+  ts: number;
+  seat: Seat;
+  played: Bid;
+  recommended: Bid;
+  bestStrength: number;
+  threshold: number;
   explanation: string;
 }
 

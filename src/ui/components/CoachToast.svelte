@@ -1,10 +1,14 @@
 <script lang="ts">
   import { coachStore } from '../stores/coach.store.svelte';
   import { RANK_LABEL, SUIT_GLYPH } from '@i18n/notation';
-  import type { Card } from '@core/types';
+  import type { Bid, Card } from '@core/types';
 
   function lbl(c: Card): string {
     return `${RANK_LABEL[c.rank]}${SUIT_GLYPH[c.suit]}`;
+  }
+  function bidLabel(b: Bid): string {
+    if (b.kind === 'pass') return 'passer';
+    return `prendre ${SUIT_GLYPH[b.trump]}`;
   }
 </script>
 
@@ -12,17 +16,25 @@
   {@const w = coachStore.current}
   <div class="coach" role="alert">
     <header>
-      <span class="badge">Coach</span>
+      <span class="badge">Coach · {w.kind === 'bid' ? 'enchère' : 'jeu'}</span>
       <button class="close" onclick={() => coachStore.dismiss()} aria-label="Fermer">×</button>
     </header>
     <div class="body">
-      <div class="line">
-        <span class="played">Joué : <strong>{lbl(w.played)}</strong></span>
-        <span class="rec">Recommandé : <strong>{lbl(w.recommended)}</strong></span>
-      </div>
-      <p class="explain">{w.explanation}</p>
-      {#if w.rationale}
-        <p class="rationale"><em>{w.rationale}</em></p>
+      {#if w.kind === 'play'}
+        <div class="line">
+          <span class="played">Joué : <strong>{lbl(w.played)}</strong></span>
+          <span class="rec">Recommandé : <strong>{lbl(w.recommended)}</strong></span>
+        </div>
+        <p class="explain">{w.explanation}</p>
+        {#if w.rationale}
+          <p class="rationale"><em>{w.rationale}</em></p>
+        {/if}
+      {:else}
+        <div class="line">
+          <span class="played">Choisi : <strong>{bidLabel(w.played)}</strong></span>
+          <span class="rec">Recommandé : <strong>{bidLabel(w.recommended)}</strong></span>
+        </div>
+        <p class="explain">{w.explanation}</p>
       {/if}
     </div>
   </div>
@@ -72,6 +84,7 @@
     justify-content: space-between;
     margin-bottom: 4px;
     font-size: 12px;
+    gap: 8px;
   }
   .played strong {
     color: #fca5a5;

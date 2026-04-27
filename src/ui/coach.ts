@@ -1,10 +1,11 @@
 // Logique d'évaluation Coach : compare le coup humain au top level4.
 // Renvoie un message pédagogique si l'écart est significatif.
 
-import type { Card, DealState, Seat, Trick } from '@core/types';
+import type { Bid, Card, DealState, Seat, Suit, Trick } from '@core/types';
 import { partner } from '@core/types';
 import { masterSeat } from '@core/rules/trick';
 import { cardPoints, cardStrength } from '@core/rules/ordering';
+import { handStrength } from '@ai/common/hand-strength';
 import type { AIPlayer, CandidatePlay } from '@ai/types';
 import { RANK_LABEL, SUIT_GLYPH } from '@i18n/notation';
 
@@ -46,6 +47,73 @@ export async function evaluateHumanPlay(
 
 function lbl(c: Card): string {
   return `${RANK_LABEL[c.rank]}${SUIT_GLYPH[c.suit]}`;
+}
+
+export interface CoachBidVerdict {
+  recommendation: Bid;
+  /** Force de main estimée pour la meilleure option « take » envisagée. */
+  bestStrength: number;
+  threshold: number;
+  explanation: string;
+}
+
+/** Compare l'enchère humaine à ce que le coach (level4) aurait fait. */
+export function evaluateHumanBid(
+  state: DealState,
+  seat: Seat,
+  allowed: readonly Bid[],
+  played: Bid,
+): CoachBidVerdict | null {
+  if (state.phase.kind !== 'bidding') return null;
+  const round = state.phase.phase.round;
+  const threshold = round === 1 ? 48 : 56;
+  const hand = state.hands[seat];
+  // Calcule la force de main pour chaque take possible.
+  let bestStrength = 0;
+  let bestTake: Bid | null = null;
+  for (const b of allowed) {
+    if (b.kind !== 'take') continue;
+    const wouldHaveFaceUp = round === 1;
+    const augmented = wouldHaveFaceUp ? [...hand, state.faceUp] : hand;
+    const s = handStrength(augmented, b.trump, wouldHaveFaceUp);
+    if (s > bestStrength) {
+      bestStrength = s;
+      bestTake = b;
+    }
+  }
+  const coachRec: Bid =
+    bestStrength >= threshold && bestTake ? bestTake : { kind: 'pass' };
+
+  if (bidsEqual(coachRec, played)) return null;
+
+  const explanation = explainBid(played, coachRec, bestStrength, threshold, round);
+  return { recommendation: coachRec, bestStrength, threshold, explanation };
+}
+
+function bidsEqual(a: Bid, b: Bid): boolean {
+  if (a.kind === 'pass' && b.kind === 'pass') return true;
+  if (a.kind === 'take' && b.kind === 'take') return a.trump === b.trump;
+  return false;
+}
+
+function suitName(s: Suit): string {
+  return SUIT_GLYPH[s];
+}
+
+function explainBid(played: Bid, rec: Bid, strength: number, threshold: number, round: 1 | 2): string {
+  // Cas 1 : passe alors que coach aurait pris.
+  if (played.kind === 'pass' && rec.kind === 'take') {
+    return `Main estimée à ${strength.toFixed(0)} (seuil ${threshold} en tour ${round}). Prendre à ${suitName(rec.trump)} aurait été favorable.`;
+  }
+  // Cas 2 : prend alors que coach aurait passé.
+  if (played.kind === 'take' && rec.kind === 'pass') {
+    return `Main estimée à ${strength.toFixed(0)}, sous le seuil de ${threshold} en tour ${round}. Risque élevé de chuter — passer était plus sûr.`;
+  }
+  // Cas 3 : prend mais à la mauvaise couleur (ne devrait pas arriver souvent — coach prend la plus forte).
+  if (played.kind === 'take' && rec.kind === 'take') {
+    return `Prendre à ${suitName(rec.trump)} (force ${strength.toFixed(0)}) aurait été plus solide qu'à ${suitName(played.trump)}.`;
+  }
+  return '';
 }
 
 function explain(

@@ -9,11 +9,12 @@ import { createRng, randomSeed } from '@core/rng';
 import type { AIConfig, AIPlayer } from '@ai/types';
 import { createAI } from '@ai/registry';
 import { createWorkerAI } from '@/workers/ai.client';
+import { legalBids } from '@core/bidding';
 import { Orchestrator } from '../orchestrator';
 import { debugStore } from './debug.store.svelte';
 import { settingsStore } from './settings.store.svelte';
 import { coachStore } from './coach.store.svelte';
-import { evaluateHumanPlay } from '../coach';
+import { evaluateHumanPlay, evaluateHumanBid } from '../coach';
 
 function useWorkerForLevel(level: AIConfig['level']): boolean {
   return level >= 4;
@@ -291,6 +292,27 @@ function makeStore() {
   function submitHumanBid(seat: Seat, bid: Bid): void {
     if (!orch) return;
     state.awaitingHuman = null;
+    // Évaluation coach sur l'enchère.
+    if (settingsStore.value.coachWarnings && coachAIs[seat] && state.deal.phase.kind === 'bidding') {
+      try {
+        const allowed = legalBids(state.deal.phase.phase);
+        const verdict = evaluateHumanBid(state.deal, seat, allowed, bid);
+        if (verdict) {
+          coachStore.push({
+            kind: 'bid',
+            ts: Date.now(),
+            seat,
+            played: bid,
+            recommended: verdict.recommendation,
+            bestStrength: verdict.bestStrength,
+            threshold: verdict.threshold,
+            explanation: verdict.explanation,
+          });
+        }
+      } catch {
+        /* coach silencieux */
+      }
+    }
     // Notifie les coachs.
     for (const c of Object.values(coachAIs)) c?.observe({ type: 'bid', seat, bid });
     orch.submitHumanAction({ type: 'bid', seat, bid });
@@ -310,6 +332,7 @@ function makeStore() {
         const verdict = await evaluateHumanPlay(coach, state.deal, seat, legal, card);
         if (verdict) {
           coachStore.push({
+            kind: 'play',
             ts: Date.now(),
             seat,
             played: card,
