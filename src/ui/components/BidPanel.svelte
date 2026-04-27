@@ -6,10 +6,11 @@
 
   interface Props {
     phase: BidPhase;
+    interactive?: boolean;
     onBid: (bid: Bid) => void;
   }
 
-  const { phase, onBid }: Props = $props();
+  const { phase, interactive = true, onBid }: Props = $props();
   const bids = $derived(legalBids(phase));
 
   function label(b: Bid): string {
@@ -26,11 +27,15 @@
       <CardView card={phase.faceUp} />
     </div>
   </div>
-  <div class="actions">
-    {#each bids as b}
-      <button type="button" class="bid-btn" onclick={() => onBid(b)}>{label(b)}</button>
-    {/each}
-  </div>
+  {#if interactive}
+    <div class="actions">
+      {#each bids as b}
+        <button type="button" class="bid-btn" onclick={() => onBid(b)}>{label(b)}</button>
+      {/each}
+    </div>
+  {:else}
+    <div class="waiting">En attente de <strong>{SEAT_SHORT[phase.toAct]}</strong>…</div>
+  {/if}
   {#if phase.bids.length > 0}
     <div class="history">
       <strong>Annonces :</strong>
@@ -78,6 +83,11 @@
   }
   .bid-btn:hover {
     background: #374151;
+  }
+  .waiting {
+    color: #d1d5db;
+    font-style: italic;
+    padding: 8px 0;
   }
   .history {
     font-size: 13px;

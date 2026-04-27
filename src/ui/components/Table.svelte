@@ -104,11 +104,11 @@
 
   <div class="center">
     {#if phase.kind === 'bidding'}
-      {#if isHuman(phase.phase.toAct)}
-        <BidPanel phase={phase.phase} onBid={(b) => onBid(phase.phase.toAct, b)} />
-      {:else}
-        <div class="info">En attente de {SEAT_SHORT[phase.phase.toAct]}…</div>
-      {/if}
+      <BidPanel
+        phase={phase.phase}
+        interactive={isHuman(phase.phase.toAct)}
+        onBid={(b) => onBid(phase.phase.toAct, b)}
+      />
     {:else if phase.kind === 'playing'}
       <div class="trump-indic">
         Atout : <strong>{SUIT_GLYPH[phase.trump]}</strong> · Preneur :
@@ -240,10 +240,6 @@
   @keyframes pulse {
     0%, 100% { transform: scale(1); opacity: 0.85; }
     50% { transform: scale(1.2); opacity: 1; }
-  }
-  .info {
-    color: #d1d5db;
-    font-style: italic;
   }
   .trump-indic {
     background: rgba(0, 0, 0, 0.4);
