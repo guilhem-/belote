@@ -109,13 +109,19 @@
         interactive={isHuman(phase.phase.toAct)}
         onBid={(b) => onBid(phase.phase.toAct, b)}
       />
-    {:else if phase.kind === 'playing'}
+    {:else if phase.kind === 'playing' || displayedTrick}
+      {@const trumpEff = phase.kind === 'playing' ? phase.trump : phase.result.trump}
+      {@const takerEff = phase.kind === 'playing' ? phase.taker : phase.result.taker}
+      {@const tricksEff = phase.kind === 'playing' ? phase.tricks : phase.result.tricks}
+      {@const currentEff = phase.kind === 'playing'
+        ? phase.current
+        : { leader: takerEff, cards: [] as readonly { seat: Seat; card: Card }[] }}
       <div class="trump-indic">
-        Atout : <strong>{SUIT_GLYPH[phase.trump]}</strong> · Preneur :
-        <strong>{SEAT_SHORT[phase.taker]}</strong>
+        Atout : <strong>{SUIT_GLYPH[trumpEff]}</strong> · Preneur :
+        <strong>{SEAT_SHORT[takerEff]}</strong>
       </div>
-      <Trick trick={displayedTrick ?? phase.current} layout={trickLayout} />
-      <TricksRecap tricks={phase.tricks} trump={phase.trump} />
+      <Trick trick={displayedTrick ?? currentEff} layout={trickLayout} />
+      <TricksRecap tricks={tricksEff} trump={trumpEff} />
     {:else}
       <div class="result-box">
         <h3>Donne terminée</h3>
