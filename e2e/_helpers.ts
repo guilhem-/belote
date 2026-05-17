@@ -26,6 +26,7 @@ export async function resetStorageWithoutAnim(page: Page): Promise<void> {
         autoNextDeal: true,
         coachWarnings: false,
         dealAnimation: false,
+        enforceTrumpAfterAnyCut: true,
       };
       localStorage.setItem('belote.settings.v1', JSON.stringify(settings));
     } catch {

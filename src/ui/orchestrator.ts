@@ -5,7 +5,7 @@ import type { Bid, Card, DealState, Seat } from '@core/types';
 import type { AIPlayer, BidReasoning, ObservableEvent, PlayReasoning } from '@ai/types';
 import { apply, expectedToPlay, RedealRequired, type GameEvent, whoActs } from '@core/game-state';
 import { legalBids } from '@core/bidding';
-import { legalMoves } from '@core/rules/legal-moves';
+import { legalMoves, type LegalMovesOpts } from '@core/rules/legal-moves';
 
 export interface OrchestratorCallbacks {
   /** Appelée à chaque application d'event (UI peut update). */
@@ -23,8 +23,11 @@ export interface OrchestratorCallbacks {
   /** Capture le Reasoning de chaque décision IA pour le panneau debug. */
   onAiReasoning?: (seat: Seat, kind: 'bid' | 'play', reasoning: BidReasoning | PlayReasoning, card?: Card, bid?: Bid) => void;
   /** Appelé après que le 4e coup a été appliqué. Le callback peut retourner une promesse
-   *  pour bloquer la résolution UI (laisse le pli visible le temps voulu). */
-  onTrickComplete?: (completedTrick: { leader: Seat; cards: readonly { seat: Seat; card: Card }[]; winner: Seat; points: number }) => Promise<void>;
+   *  pour bloquer la résolution UI (laisse le pli visible le temps voulu).
+   *  `isLast` vaut true pour le 8ᵉ et dernier pli — l'UI peut allonger la pause. */
+  onTrickComplete?: (completedTrick: { leader: Seat; cards: readonly { seat: Seat; card: Card }[]; winner: Seat; points: number; isLast: boolean }) => Promise<void>;
+  /** Options de règles transmises à legalMoves (variantes régionales). */
+  playRuleOptions?: LegalMovesOpts;
 }
 
 export interface PlayerSetup {
@@ -111,7 +114,7 @@ export class Orchestrator {
         }
       }
     } else if (this.state.phase.kind === 'playing') {
-      const legal = legalMoves(this.state.hands[seat], this.state.phase.current, this.state.phase.trump, seat);
+      const legal = legalMoves(this.state.hands[seat], this.state.phase.current, this.state.phase.trump, seat, this.cb.playRuleOptions);
       const decision = await ai.chooseCard(redactState(this.state, seat), legal);
       this.cb.onAiReasoning?.(seat, 'play', decision.reasoning, decision.card);
       await this.delay();
@@ -156,7 +159,7 @@ export class Orchestrator {
       this.state = after;
       this.cb.onEvent?.(event, before, after);
       // Détection fin de pli.
-      let completedTrick: { winner: Seat; points: number; leader: Seat; cards: readonly { seat: Seat; card: Card }[] } | null = null;
+      let completedTrick: { winner: Seat; points: number; leader: Seat; cards: readonly { seat: Seat; card: Card }[]; isLast: boolean } | null = null;
       if (
         before.phase.kind === 'playing' &&
         after.phase.kind === 'playing' &&

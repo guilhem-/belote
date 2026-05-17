@@ -27,6 +27,9 @@ export const SettingsSchemaV1 = z.object({
   coachWarnings: z.boolean().default(false),
   /** Animation de distribution (3s) au début de chaque donne. */
   dealAnimation: z.boolean().default(true),
+  /** Variante "pisse obligatoire" : sur tour non-atout, si un autre joueur a déjà coupé
+   *  (même le partenaire), le joueur doit fournir de l'atout. Default: true. */
+  enforceTrumpAfterAnyCut: z.boolean().default(true),
 });
 
 export type Settings = z.infer<typeof SettingsSchemaV1>;
@@ -46,4 +49,5 @@ export const DEFAULT_SETTINGS_V1: Settings = {
   autoNextDeal: true,
   coachWarnings: false,
   dealAnimation: true,
+  enforceTrumpAfterAnyCut: true,
 };

@@ -120,3 +120,54 @@ describe('legalMoves — partenaire maître + obligation couper', () => {
     expect(moves.length).toBe(2); // pas obligé de couper
   });
 });
+
+describe('legalMoves — option enforceTrumpAfterAnyCut', () => {
+  it('partenaire maître par coupe + option ON → doit fournir l\'atout', () => {
+    // N entame ♦, E coupe avec 8♥, S = partenaire de N → mais ici E coupe, donc E maître,
+    // pas N. Pour avoir partenaire-maître-par-coupe : N entame, E défausse hors couleur,
+    // S coupe (N = leader, S = partenaire de N → S devient maître).
+    // En fait pour ce cas il faut : adversaire entame, partenaire coupe, je joue.
+    // Soit : E entame ♦, N (partenaire de S) coupe avec V♥, W joue ♦, S doit jouer.
+    // Hmm... rotation joueurs N→W→S→E→N. Si E entame, ordre = E, N, W, S.
+    // Donc : E pose 10♦, N pose V♥ (coupe), W pose 7♦, S doit jouer.
+    // S n'a pas ♦. Partenaire (N) est maître par coupe.
+    const hand = [C('7', 'H'), C('Q', 'H'), C('A', 'C')];
+    const trick = T('E', [P('E', '10', 'D'), P('N', 'J', 'H'), P('W', '7', 'D')]);
+
+    // Sans option : S peut défausser librement (partenaire maître).
+    const movesDefault = legalMoves(hand, trick, 'H', 'S');
+    expect(movesDefault.length).toBe(3);
+
+    // Avec option : S doit fournir de l'atout (mais pas obligé de monter au-dessus du partenaire).
+    const movesStrict = legalMoves(hand, trick, 'H', 'S', { enforceTrumpAfterAnyCut: true });
+    expect(movesStrict.map((c) => c.rank).sort()).toEqual(['7', 'Q']);
+  });
+
+  it('option ON sans atout en main → défausse libre (rien à fournir)', () => {
+    const hand = [C('A', 'C'), C('K', 'S')];
+    const trick = T('E', [P('E', '10', 'D'), P('N', 'J', 'H'), P('W', '7', 'D')]);
+    const moves = legalMoves(hand, trick, 'H', 'S', { enforceTrumpAfterAnyCut: true });
+    expect(moves.length).toBe(2);
+  });
+
+  it('option ON sans coupe préalable → comportement standard (défausse libre)', () => {
+    // Partenaire maître via la couleur entamée (pas par coupe) → option n'a pas d'effet.
+    const hand = [C('7', 'H'), C('A', 'C')];
+    const trick = T('N', [P('N', 'A', 'D'), P('E', '7', 'C')]);
+    const moves = legalMoves(hand, trick, 'H', 'S', { enforceTrumpAfterAnyCut: true });
+    expect(moves.length).toBe(2);
+  });
+
+  it('option ON, partenaire maître par coupe, sur-coupe adverse précédente → sur-coupe non requise', () => {
+    // E entame ♦, N coupe avec V♥ (force 7), W sur-coupe pas (W joue ♦ → impossible),
+    // hmm refaisons : E pose ♦, N coupe avec 9♥ (force 6), W pose D♥ (sous-coupe), S joue.
+    // Actually for partner-master with the cut, we need partner to be currently master.
+    // Suppose : E 10♦, N 9♥ (coupe, force 6), W 7♦ (joue couleur), S doit jouer.
+    // S partenaire de N. N est maître (9♥ > 10♦). S n'a pas ♦.
+    // Option ON : S doit fournir atout. Pas obligation monter au-dessus de N.
+    const hand = [C('7', 'H'), C('K', 'H'), C('A', 'C')];
+    const trick = T('E', [P('E', '10', 'D'), P('N', '9', 'H'), P('W', '7', 'D')]);
+    const moves = legalMoves(hand, trick, 'H', 'S', { enforceTrumpAfterAnyCut: true });
+    expect(moves.map((c) => c.rank).sort()).toEqual(['7', 'K']);
+  });
+});

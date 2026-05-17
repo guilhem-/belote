@@ -141,6 +141,22 @@
     </section>
 
     <section>
+      <h3>Variantes de règles</h3>
+      <label>
+        <input
+          type="checkbox"
+          checked={settingsStore.value.enforceTrumpAfterAnyCut}
+          onchange={(e) =>
+            settingsStore.set((c) => ({
+              ...c,
+              enforceTrumpAfterAnyCut: e.currentTarget.checked,
+            }))}
+        />
+        Pisse : fournit de l'atout quand un autre joueur a coupé avant
+      </label>
+    </section>
+
+    <section>
       <h3>Confort</h3>
       <div class="layout-choice">
         <label>
