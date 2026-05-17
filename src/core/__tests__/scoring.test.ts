@@ -121,6 +121,33 @@ describe('scoreDeal — belote', () => {
     expect(r.nsScore).toBe(20);
   });
 
+  it('81-81 + belote preneur → tient (la belote fait basculer le contrat)', () => {
+    const t = makeTricks(81, 81, true);
+    const ann: Announcement[] = [{ kind: 'belote', seat: 'S' }];
+    const r = scoreDeal({ tricks: t, taker: 'S', trump: 'H', announcements: ann });
+    expect(r.dedans).toBe(false);
+    expect(r.nsScore).toBe(101); // 81 + 20
+    expect(r.ewScore).toBe(81);
+  });
+
+  it('81-81 + belote défense → dedans (la belote scelle la chute du preneur)', () => {
+    const t = makeTricks(81, 81, true);
+    const ann: Announcement[] = [{ kind: 'belote', seat: 'E' }];
+    const r = scoreDeal({ tricks: t, taker: 'S', trump: 'H', announcements: ann });
+    expect(r.dedans).toBe(true);
+    expect(r.nsScore).toBe(0); // pas de belote preneur, points cartes perdus
+    expect(r.ewScore).toBe(162 + 20);
+  });
+
+  it('71-91 + belote preneur → encore dedans (91 vs 91 = égalité, seuil strict)', () => {
+    const t = makeTricks(71, 91, false);
+    const ann: Announcement[] = [{ kind: 'belote', seat: 'S' }];
+    const r = scoreDeal({ tricks: t, taker: 'S', trump: 'H', announcements: ann });
+    expect(r.dedans).toBe(true);
+    expect(r.nsScore).toBe(20); // belote preneur conservée
+    expect(r.ewScore).toBe(162);
+  });
+
   it('belote + rebelote dédupliquées → un seul bonus', () => {
     const t = makeTricks(90, 72, true);
     const ann: Announcement[] = [
