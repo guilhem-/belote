@@ -33,6 +33,8 @@ interface UiState {
   pendingHumanCard: { seat: Seat; card: Card } | null;
   /** Animation de distribution en cours (orchestrateur en attente). */
   dealingAnimation: boolean;
+  /** Bannière éphémère "Belote !" / "Rebelote !" quand un joueur l'annonce. */
+  beloteBanner: { kind: 'belote' | 'rebelote'; seat: Seat } | null;
 }
 
 function deriveDealSeed(matchSeed: number, dealIndex: number, attempt = 0): number {
@@ -84,6 +86,7 @@ function makeStore() {
       displayedTrick: null,
       pendingHumanCard: null,
       dealingAnimation: false,
+      beloteBanner: null,
     };
   }
 
@@ -120,8 +123,20 @@ function makeStore() {
     orch = new Orchestrator(state.deal, { ais }, {
       paceMs: settingsStore.value.paceMs,
       bidPaceMs: settingsStore.value.bidPaceMs,
-      onEvent: (ev, _before, after) => {
+      playRuleOptions: { enforceTrumpAfterAnyCut: settingsStore.value.enforceTrumpAfterAnyCut },
+      onEvent: (ev, before, after) => {
         state.deal = after;
+        // Détecte une nouvelle annonce Belote/Rebelote et déclenche la bannière.
+        if (after.announcements.length > before.announcements.length) {
+          const newest = after.announcements[after.announcements.length - 1]!;
+          if (newest.kind === 'belote' || newest.kind === 'rebelote') {
+            state.beloteBanner = { kind: newest.kind, seat: newest.seat };
+            const myBanner = state.beloteBanner;
+            setTimeout(() => {
+              if (state.beloteBanner === myBanner) state.beloteBanner = null;
+            }, 1800);
+          }
+        }
         // Forward bid/play à tous les coachs.
         for (const c of Object.values(coachAIs)) {
           if (ev.type === 'bid') c?.observe({ type: 'bid', seat: ev.seat, bid: ev.bid });
@@ -147,8 +162,10 @@ function makeStore() {
       onTrickComplete: (trick) =>
         new Promise<void>((resolve) => {
           // Affiche le pli complet pendant ~60% de la cadence, clamp [400ms, 3000ms].
+          // Pour le 8ᵉ pli, on garantit au moins 1000ms pour laisser voir le dernier coup.
           const pace = settingsStore.value.paceMs;
-          const ms = Math.min(3000, Math.max(400, Math.round(pace * 0.6)));
+          let ms = Math.min(3000, Math.max(400, Math.round(pace * 0.6)));
+          if (trick.isLast) ms = Math.max(1000, ms);
           state.displayedTrick = { leader: trick.leader, cards: trick.cards.slice() };
           setTimeout(() => {
             state.displayedTrick = null;
@@ -159,7 +176,9 @@ function makeStore() {
         state.awaitingHuman = seat;
         if (state.deal.phase.kind === 'playing') {
           const playing = state.deal.phase;
-          const legal = legalMoves(state.deal.hands[seat], playing.current, playing.trump, seat);
+          const legal = legalMoves(state.deal.hands[seat], playing.current, playing.trump, seat, {
+            enforceTrumpAfterAnyCut: settingsStore.value.enforceTrumpAfterAnyCut,
+          });
 
           // Pré-clic : si l'humain a déjà choisi une carte légale, la joue.
           const pending = state.pendingHumanCard;
@@ -268,6 +287,7 @@ function makeStore() {
       displayedTrick: null,
       pendingHumanCard: null,
       dealingAnimation: false,
+      beloteBanner: null,
     };
     debugStore.clear();
     startOrchestrator();
@@ -285,6 +305,7 @@ function makeStore() {
     state.awaitingHuman = null;
     state.displayedTrick = null;
     state.dealingAnimation = false;
+    state.beloteBanner = null;
     startOrchestrator();
   }
 
@@ -305,6 +326,7 @@ function makeStore() {
     state.awaitingHuman = null;
     state.displayedTrick = null;
     state.dealingAnimation = false;
+    state.beloteBanner = null;
     startOrchestrator();
   }
 
@@ -346,7 +368,9 @@ function makeStore() {
     const coach = coachAIs[seat];
     if (coach && state.deal.phase.kind === 'playing') {
       const playing = state.deal.phase;
-      const legal = legalMoves(state.deal.hands[seat], playing.current, playing.trump, seat);
+      const legal = legalMoves(state.deal.hands[seat], playing.current, playing.trump, seat, {
+        enforceTrumpAfterAnyCut: settingsStore.value.enforceTrumpAfterAnyCut,
+      });
       try {
         const verdict = await evaluateHumanPlay(coach, state.deal, seat, legal, card);
         if (verdict) {

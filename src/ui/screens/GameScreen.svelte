@@ -8,6 +8,7 @@
   import AboutPanel from '../components/AboutPanel.svelte';
   import Confetti from '../components/Confetti.svelte';
   import CoachToast from '../components/CoachToast.svelte';
+  import BeloteAnnounce from '../components/BeloteAnnounce.svelte';
   import ReasoningPanel from '../components/debug/ReasoningPanel.svelte';
   import { SEAT_SHORT as seatShort } from '@i18n/notation';
   import { SEAT_TEAM } from '@core/types';
@@ -121,6 +122,7 @@
       displayedTrick={matchStore.value.displayedTrick}
       pendingCard={matchStore.value.pendingHumanCard}
       dealingAnimation={matchStore.value.dealingAnimation}
+      playRuleOptions={{ enforceTrumpAfterAnyCut: settingsStore.value.enforceTrumpAfterAnyCut }}
       {humanSeats}
       {revealedSeats}
       trickLayout={settingsStore.value.trickLayout}
@@ -162,6 +164,7 @@
 
   <Confetti active={humanWon} />
   <CoachToast />
+  <BeloteAnnounce banner={matchStore.value.beloteBanner} />
 
   <ReasoningPanel />
   {#if settingsOpen}
