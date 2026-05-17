@@ -120,6 +120,7 @@
       deal={matchStore.value.deal}
       displayedTrick={matchStore.value.displayedTrick}
       pendingCard={matchStore.value.pendingHumanCard}
+      dealingAnimation={matchStore.value.dealingAnimation}
       {humanSeats}
       {revealedSeats}
       trickLayout={settingsStore.value.trickLayout}

@@ -1,14 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { resetStorageWithoutAnim } from './_helpers';
 
 test.describe('smoke — chargement initial', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      try {
-        localStorage.clear();
-      } catch {
-        /* ignore */
-      }
-    });
+    await resetStorageWithoutAnim(page);
   });
 
   test('la page charge et affiche le titre', async ({ page }) => {

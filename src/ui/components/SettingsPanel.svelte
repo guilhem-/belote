@@ -170,6 +170,15 @@
           />
           Coach : avertir quand un coup humain semble sous-optimal
         </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={settingsStore.value.dealAnimation}
+            onchange={(e) =>
+              settingsStore.set((c) => ({ ...c, dealAnimation: e.currentTarget.checked }))}
+          />
+          Animer la distribution des cartes (3s au début de chaque donne)
+        </label>
       </div>
     </section>
 

@@ -25,6 +25,8 @@ export const SettingsSchemaV1 = z.object({
   /** Affiche des avertissements quand le joueur humain fait un coup
    *  sous-optimal d'après l'IA conseil (level4, mêmes informations que l'humain). */
   coachWarnings: z.boolean().default(false),
+  /** Animation de distribution (3s) au début de chaque donne. */
+  dealAnimation: z.boolean().default(true),
 });
 
 export type Settings = z.infer<typeof SettingsSchemaV1>;
@@ -43,4 +45,5 @@ export const DEFAULT_SETTINGS_V1: Settings = {
   autoPlayLastCard: true,
   autoNextDeal: true,
   coachWarnings: false,
+  dealAnimation: true,
 };

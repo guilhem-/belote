@@ -1,14 +1,9 @@
 import { test } from '@playwright/test';
+import { resetStorageWithoutAnim } from './_helpers';
 
 test.describe('captures visuelles', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      try {
-        localStorage.clear();
-      } catch {
-        /* ignore */
-      }
-    });
+    await resetStorageWithoutAnim(page);
   });
 
   test('état initial', async ({ page }) => {

@@ -1,14 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { resetStorageWithoutAnim } from './_helpers';
 
 test.describe('options de confort', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      try {
-        localStorage.clear();
-      } catch {
-        /* ignore */
-      }
-    });
+    await resetStorageWithoutAnim(page);
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   });
 

@@ -31,6 +31,8 @@ interface UiState {
   /** Carte pré-sélectionnée par l'humain (cliquée avant son tour) ; jouée auto quand
    *  son tour arrive si elle est légale. */
   pendingHumanCard: { seat: Seat; card: Card } | null;
+  /** Animation de distribution en cours (orchestrateur en attente). */
+  dealingAnimation: boolean;
 }
 
 function deriveDealSeed(matchSeed: number, dealIndex: number, attempt = 0): number {
@@ -81,6 +83,7 @@ function makeStore() {
       awaitingHuman: null,
       displayedTrick: null,
       pendingHumanCard: null,
+      dealingAnimation: false,
     };
   }
 
@@ -235,7 +238,20 @@ function makeStore() {
         faceUp: state.deal.faceUp,
       });
     }
-    void orch.run();
+    // Animation de distribution (3s) avant de lancer l'orchestrateur.
+    if (settingsStore.value.dealAnimation) {
+      state.dealingAnimation = true;
+      const myOrch = orch;
+      setTimeout(() => {
+        // Ne lance que si l'orchestrateur courant est toujours le même (pas remplacé par newMatch/nextDeal).
+        if (orch === myOrch) {
+          state.dealingAnimation = false;
+          void myOrch.run();
+        }
+      }, 3000);
+    } else {
+      void orch.run();
+    }
   }
 
   function newMatch(seed: number = randomSeed()): void {
@@ -251,6 +267,7 @@ function makeStore() {
       awaitingHuman: null,
       displayedTrick: null,
       pendingHumanCard: null,
+      dealingAnimation: false,
     };
     debugStore.clear();
     startOrchestrator();
@@ -267,6 +284,7 @@ function makeStore() {
     state.dealSeed = dealSeed;
     state.awaitingHuman = null;
     state.displayedTrick = null;
+    state.dealingAnimation = false;
     startOrchestrator();
   }
 
@@ -286,6 +304,7 @@ function makeStore() {
     state.dealSeed = dealSeed;
     state.awaitingHuman = null;
     state.displayedTrick = null;
+    state.dealingAnimation = false;
     startOrchestrator();
   }
 

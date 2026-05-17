@@ -7,6 +7,7 @@
   import Trick from './Trick.svelte';
   import BidPanel from './BidPanel.svelte';
   import TricksRecap from './TricksRecap.svelte';
+  import DealAnimation from './DealAnimation.svelte';
 
   interface Props {
     deal: DealState;
@@ -20,6 +21,8 @@
     trickLayout?: 'cross' | 'inline';
     /** Carte pré-sélectionnée par l'humain (highlight) — destinée à être jouée à son tour. */
     pendingCard?: { seat: Seat; card: Card } | null;
+    /** Si vrai, masque le contenu central et lance l'animation de distribution. */
+    dealingAnimation?: boolean;
     onBid: (seat: Seat, bid: Bid) => void;
     onPlay: (seat: Seat, card: Card) => void;
     onPreselect?: (seat: Seat, card: Card) => void;
@@ -32,6 +35,7 @@
     revealedSeats,
     trickLayout = 'cross',
     pendingCard = null,
+    dealingAnimation = false,
     onBid,
     onPlay,
     onPreselect,
@@ -68,7 +72,10 @@
   }
 </script>
 
-<div class="table-grid">
+<div class="table-grid" class:dealing={dealingAnimation}>
+  {#if dealingAnimation}
+    <DealAnimation dealer={deal.dealer} />
+  {/if}
   <div class="seat seat-N" class:active={isActing('N')}>
     <div class="badge">{SEAT_SHORT.N}</div>
     {#if isActing('N')}<div class="active-marker top">▼</div>{/if}
@@ -169,6 +176,7 @@
 
 <style>
   .table-grid {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr 2fr 1fr;
     grid-template-rows: auto 1fr auto;
@@ -179,6 +187,11 @@
     min-height: 0;
     height: 100%;
     overflow: hidden;
+  }
+  /* Pendant l'animation : masque le contenu (les mains s'afficheront après) */
+  .table-grid.dealing > .seat,
+  .table-grid.dealing > .center {
+    visibility: hidden;
   }
   .seat {
     display: flex;
