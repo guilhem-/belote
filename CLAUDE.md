@@ -5,7 +5,7 @@ points de friction, choix d'archi qui ne se devinent pas en lisant le code.
 
 ## Stack
 
-- TypeScript strict + Vite + Svelte 5 (runes), Tailwind 4
+- TypeScript strict + Vite + Svelte 5 (runes), Tailwind 3
 - Vitest + fast-check pour les tests unitaires
 - Playwright pour les e2e (dossier `e2e/`)
 - Comlink pour les Web Workers IA (niveaux 4-5 en worker)
@@ -26,6 +26,7 @@ points de friction, choix d'archi qui ne se devinent pas en lisant le code.
 - `scripts/tournament.ts` — tournoi générique CLI
 - `scripts/compare-strategies.ts` — variantes level4 vs baseline
 - `scripts/level5-vs-level4.ts` — PIMC vs heuristique
+- `scripts/benchmark-ai.ts` — latence par décision IA (`npm run benchmark`)
 
 ## Conventions code
 
@@ -130,13 +131,21 @@ Push sur `main` → déploiement auto.
 
 ```bash
 npm run dev              # serveur dev local
-npm test                 # vitest unitaires
+npm run preview          # preview du build prod
+npm test                 # vitest unitaires (run unique)
+npm run test:watch       # vitest en watch
+npm run test:coverage    # couverture v8
 npm run e2e              # playwright e2e (auto-démarre le dev server)
+npm run e2e:ui           # playwright en mode UI interactif
 npm run typecheck        # svelte-check + tsc scripts
 npm run lint             # eslint --max-warnings 0
+npm run format           # prettier --write .
 npm run build            # build prod (dist/)
 npm run ci               # lint + typecheck + test + build
 npm run tournament -- --teamA 5 --teamB 4 --games 100   # tournoi générique
+npm run benchmark        # latence IA (scripts/benchmark-ai.ts)
 npx tsx scripts/level5-vs-level4.ts --games 100 --budget 200
 npx tsx scripts/compare-strategies.ts --games 1000 --seed 0xCAFE
 ```
+
+Exécuter un seul test : `npx vitest run path/to/file.test.ts -t "nom du test"`.
