@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Bid, Card, DealState, Seat, Suit, Trick as TrickType } from '@core/types';
-  import { legalMoves } from '@core/rules/legal-moves';
+  import { legalMoves, type LegalMovesOpts } from '@core/rules/legal-moves';
   import { expectedToPlay } from '@core/game-state';
   import { SEAT_SHORT, SUIT_GLYPH } from '@i18n/notation';
   import Hand from './Hand.svelte';
@@ -23,6 +23,8 @@
     pendingCard?: { seat: Seat; card: Card } | null;
     /** Si vrai, masque le contenu central et lance l'animation de distribution. */
     dealingAnimation?: boolean;
+    /** Variantes de règles pour le calcul des coups légaux. */
+    playRuleOptions?: LegalMovesOpts;
     onBid: (seat: Seat, bid: Bid) => void;
     onPlay: (seat: Seat, card: Card) => void;
     onPreselect?: (seat: Seat, card: Card) => void;
@@ -36,6 +38,7 @@
     trickLayout = 'cross',
     pendingCard = null,
     dealingAnimation = false,
+    playRuleOptions,
     onBid,
     onPlay,
     onPreselect,
@@ -51,7 +54,7 @@
 
   const legalForActing = $derived.by(() => {
     if (phase.kind !== 'playing' || !acting) return [];
-    return legalMoves(deal.hands[acting], phase.current, phase.trump, acting);
+    return legalMoves(deal.hands[acting], phase.current, phase.trump, acting, playRuleOptions);
   });
 
   function isHuman(s: Seat): boolean {
@@ -74,7 +77,7 @@
 
 <div class="table-grid" class:dealing={dealingAnimation}>
   {#if dealingAnimation}
-    <DealAnimation dealer={deal.dealer} />
+    <DealAnimation dealer={deal.dealer} faceUp={deal.faceUp} />
   {/if}
   <div class="seat seat-N" class:active={isActing('N')}>
     <div class="badge">{SEAT_SHORT.N}</div>
@@ -130,12 +133,20 @@
       <Trick trick={displayedTrick ?? currentEff} layout={trickLayout} />
       <TricksRecap tricks={tricksEff} trump={trumpEff} />
     {:else}
+      {@const r = phase.result}
+      {@const verdictClass = r.capot ? 'capot' : r.dedans ? 'dedans' : 'tenu'}
+      {@const verdictLabel = r.capot === 'taker'
+        ? 'Capot pour le preneur !'
+        : r.capot === 'defense'
+          ? 'Capot pour la défense !'
+          : r.dedans
+            ? 'Dedans !'
+            : 'Contrat tenu'}
       <div class="result-box">
         <h3>Donne terminée</h3>
-        <div>NS : {phase.result.nsScore} · EO : {phase.result.ewScore}</div>
-        {#if phase.result.dedans}<div>Dedans !</div>{/if}
-        {#if phase.result.capot}<div>Capot {phase.result.capot}</div>{/if}
-        <TricksRecap tricks={phase.result.tricks} trump={phase.result.trump} />
+        <div class="verdict {verdictClass}">{verdictLabel}</div>
+        <div class="scores">NS : <strong>{r.nsScore}</strong> · EO : <strong>{r.ewScore}</strong></div>
+        <TricksRecap tricks={r.tricks} trump={r.trump} />
       </div>
     {/if}
   </div>
@@ -270,5 +281,29 @@
     padding: 12px 18px;
     border-radius: 8px;
     text-align: center;
+  }
+  .verdict {
+    font-size: 18px;
+    font-weight: 800;
+    margin: 6px 0;
+    padding: 4px 10px;
+    border-radius: 6px;
+    display: inline-block;
+  }
+  .verdict.tenu {
+    background: #16a34a;
+    color: white;
+  }
+  .verdict.dedans {
+    background: #dc2626;
+    color: white;
+  }
+  .verdict.capot {
+    background: #7c3aed;
+    color: white;
+  }
+  .scores {
+    font-size: 14px;
+    margin-bottom: 6px;
   }
 </style>
