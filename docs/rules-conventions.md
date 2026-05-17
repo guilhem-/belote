@@ -81,12 +81,10 @@ soit S le siège qui doit jouer, c la couleur demandée (carte du leader), t l'a
 
 si S a au moins une carte de couleur c :
     si c == t :
-        si partenaire de S est actuellement maître du pli :
-            S peut jouer N'IMPORTE QUELLE carte de couleur c
-        sinon :
-            S DOIT jouer une carte de couleur c STRICTEMENT plus forte
-            que la plus forte carte de couleur c déjà posée, SI POSSIBLE.
-            Sinon, S peut jouer n'importe quelle carte de couleur c (on dit "pisser").
+        S DOIT jouer une carte de couleur c STRICTEMENT plus forte
+        que la plus forte carte de couleur c déjà posée, SI POSSIBLE.
+        Sinon, S peut jouer n'importe quelle carte de couleur c (on dit "pisser").
+        L'exception "partenaire maître" NE S'APPLIQUE PAS sur un tour d'atout.
     sinon (c != t) :
         S joue n'importe quelle carte de couleur c (pas d'obligation de monter hors-atout).
 
@@ -107,7 +105,7 @@ sinon (S n'a pas la couleur c) :
 **Notes** :
 - "Maître du pli" = a posé la carte actuellement la plus forte selon les règles d'atout.
 - "Partenaire maître" = le partenaire (NS↔NS, EW↔EW) a posé la carte maîtresse.
-- Cas particulier : si l'atout est demandé en première position (leader joue atout), tous les joueurs ayant l'atout doivent fournir, et l'obligation de monter s'applique sauf si partenaire maître.
+- Cas particulier : si l'atout est demandé en première position (leader joue atout), tous les joueurs ayant l'atout doivent fournir ET monter si possible, **même si le partenaire est maître**. L'exception "partenaire maître" ne vaut que pour les coupes/sur-coupes sur un tour non-atout.
 
 ## 7. Résolution du pli
 

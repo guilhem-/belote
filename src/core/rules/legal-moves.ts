@@ -25,11 +25,8 @@ export function legalMoves(hand: readonly Card[], trick: Trick, trump: Suit, sea
 
   if (inLed.length > 0) {
     if (ledSuit === trump) {
-      // Couleur demandée = atout.
-      if (partnerMaster) {
-        return inLed.slice();
-      }
-      // Doit monter à l'atout si possible.
+      // Couleur demandée = atout : obligation de monter si possible,
+      // même si le partenaire est actuellement maître (règle FFB).
       const highestPlayed = highestOfSuitInTrick(trick, trump, trump);
       const stronger = inLed.filter((c) => cardStrength(c, trump) > highestPlayed);
       return stronger.length > 0 ? stronger : inLed.slice();

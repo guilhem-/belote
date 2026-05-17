@@ -83,12 +83,17 @@ describe('legalMoves — couleur demandée = atout', () => {
     expect(moves).toEqual([C('J', 'H')]);
   });
 
-  it('partenaire maître à l’atout → fournir n’importe quel atout (pas obligation monter)', () => {
-    const hand = [C('7', 'H'), C('J', 'H')];
-    // N joue J atout (max), E joue 8, S = partenaire de N → S doit fournir mais pas monter.
-    const trickWithE: Trick = { leader: 'N', cards: [P('N', 'J', 'H'), P('E', '8', 'H')] };
-    const moves = legalMoves(hand, trickWithE, 'H', 'S');
-    expect(moves.length).toBe(2);
+  it('partenaire maître à l’atout → doit monter quand même (règle FFB)', () => {
+    // N joue 10♥ atout (force 4), E joue 8♥ (force 1). S = partenaire de N est maître.
+    // Mais sur un tour d'atout, S doit monter au-dessus de 10♥ si possible.
+    // Main : 7♥ (force 0), D♥ (force 2). Aucune ne monte → fournit n'importe quel atout.
+    const hand = [C('7', 'H'), C('Q', 'H')];
+    const trickNoOver: Trick = { leader: 'N', cards: [P('N', '10', 'H'), P('E', '8', 'H')] };
+    expect(legalMoves(hand, trickNoOver, 'H', 'S').length).toBe(2);
+
+    // Même situation mais S a V♥ (force 7) > 10♥ → DOIT jouer V♥.
+    const handWithJack = [C('7', 'H'), C('J', 'H')];
+    expect(legalMoves(handWithJack, trickNoOver, 'H', 'S')).toEqual([C('J', 'H')]);
   });
 
   it('aucun atout > carte la plus forte → fournit n’importe quel atout', () => {
