@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Card, Seat } from '@core/types';
   import { nextSeat } from '@core/types';
   import { SUIT_GLYPH, RANK_LABEL } from '@i18n/notation';
@@ -11,15 +12,6 @@
     durationMs?: number;
   }
   const { dealer, faceUp, durationMs = 3000 }: Props = $props();
-
-  // Positions approximatives des sièges dans la table-grid (en pourcentage).
-  const SEAT_POS: Record<Seat, { x: number; y: number }> = {
-    N: { x: 50, y: 12 },
-    S: { x: 50, y: 88 },
-    W: { x: 12, y: 50 },
-    E: { x: 88, y: 50 },
-  };
-  const CENTER = { x: 50, y: 50 };
 
   // Ordre antihoraire à partir du joueur à gauche du donneur (cf. core/deck.ts orderFromDealer).
   const order = $derived.by(() => {
@@ -45,13 +37,26 @@
     Math.max(40, Math.floor((distributionBudget - TRAVEL_MS) / Math.max(1, totalCards - 1))),
   );
 
+  // Mesuré au montage : positions finales (en px, dans le repère de l'overlay) de chaque
+  // carte des 4 mains. Les .hand sont rendues par Table.svelte en visibility:hidden,
+  // donc leur layout est valide même avant que les cartes soient visibles.
+  let overlayEl: HTMLDivElement | undefined = $state();
+  let targets: Record<Seat, { x: number; y: number }[]> | null = $state(null);
+  let center: { x: number; y: number } = $state({ x: 0, y: 0 });
+  // Origine des cartes distribuées : la main du donneur (il tient le talon).
+  let origin: { x: number; y: number } = $state({ x: 0, y: 0 });
+
   const cards = $derived.by(() => {
-    const out: { target: Seat; delay: number }[] = [];
+    if (!targets) return [];
+    const out: { delay: number; to: { x: number; y: number } }[] = [];
+    const slotIdx: Record<Seat, number> = { N: 0, E: 0, S: 0, W: 0 };
     let i = 0;
     for (const wave of WAVES) {
       for (const seat of order) {
         for (let c = 0; c < wave; c++) {
-          out.push({ target: seat, delay: i * stagger });
+          const slot = slotIdx[seat]++;
+          const dest = targets[seat][slot] ?? targets[seat][targets[seat].length - 1] ?? center;
+          out.push({ delay: i * stagger, to: dest });
           i++;
         }
       }
@@ -62,30 +67,59 @@
   // Délai d'apparition de la retourne (juste après la dernière carte distribuée).
   const faceUpDelay = $derived(Math.max(0, (totalCards - 1) * stagger + TRAVEL_MS + 60));
   const faceUpColor = $derived(faceUp.suit === 'H' || faceUp.suit === 'D' ? '#dc2626' : '#0f172a');
+
+  onMount(() => {
+    if (!overlayEl) return;
+    const overlayRect = overlayEl.getBoundingClientRect();
+    center = { x: overlayRect.width / 2, y: overlayRect.height / 2 };
+    origin = center;
+    const out: Record<Seat, { x: number; y: number }[]> = { N: [], E: [], S: [], W: [] };
+    for (const seat of ['N', 'E', 'S', 'W'] as Seat[]) {
+      const hand = document.querySelector(`.hand[data-seat="${seat}"]`);
+      if (!hand) continue;
+      for (const card of Array.from(hand.querySelectorAll('.card'))) {
+        const r = card.getBoundingClientRect();
+        out[seat].push({
+          x: r.left + r.width / 2 - overlayRect.left,
+          y: r.top + r.height / 2 - overlayRect.top,
+        });
+      }
+      if (seat === dealer) {
+        const r = hand.getBoundingClientRect();
+        origin = {
+          x: r.left + r.width / 2 - overlayRect.left,
+          y: r.top + r.height / 2 - overlayRect.top,
+        };
+      }
+    }
+    targets = out;
+  });
 </script>
 
-<div class="deal-overlay" aria-hidden="true">
-  {#each cards as c, idx (idx)}
-    <div
-      class="card-back"
-      style="
-        --from-x: {CENTER.x}%;
-        --from-y: {CENTER.y}%;
-        --to-x: {SEAT_POS[c.target].x}%;
-        --to-y: {SEAT_POS[c.target].y}%;
-        --delay: {c.delay}ms;
-        --travel: {TRAVEL_MS}ms;
-      "
-    ></div>
-  {/each}
+<div class="deal-overlay" bind:this={overlayEl} aria-hidden="true">
+  {#if targets}
+    {#each cards as c, idx (idx)}
+      <div
+        class="card-back"
+        style="
+          --from-x: {origin.x}px;
+          --from-y: {origin.y}px;
+          --to-x: {c.to.x}px;
+          --to-y: {c.to.y}px;
+          --delay: {c.delay}ms;
+          --travel: {TRAVEL_MS}ms;
+        "
+      ></div>
+    {/each}
 
-  <div
-    class="face-up"
-    style="--delay: {faceUpDelay}ms; color: {faceUpColor};"
-  >
-    <span class="rank">{RANK_LABEL[faceUp.rank]}</span>
-    <span class="suit">{SUIT_GLYPH[faceUp.suit]}</span>
-  </div>
+    <div
+      class="face-up"
+      style="--delay: {faceUpDelay}ms; left: {center.x}px; top: {center.y}px; color: {faceUpColor};"
+    >
+      <span class="rank">{RANK_LABEL[faceUp.rank]}</span>
+      <span class="suit">{SUIT_GLYPH[faceUp.suit]}</span>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -98,22 +132,18 @@
   }
   .card-back {
     position: absolute;
-    width: 26px;
-    height: 38px;
-    margin-left: -13px;
-    margin-top: -19px;
-    background: repeating-linear-gradient(
-        45deg,
-        #1e3a8a 0 4px,
-        #1e40af 4px 8px
-      );
-    border: 1.5px solid #fcd34d;
-    border-radius: 4px;
+    width: 64px;
+    height: 92px;
+    margin-left: -32px;
+    margin-top: -46px;
+    background: linear-gradient(135deg, #1d4ed8 25%, #1e3a8a 75%);
+    border: 1.5px solid #1e3a8a;
+    border-radius: 6px;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
     left: var(--from-x);
     top: var(--from-y);
     opacity: 0;
-    transform: scale(0.5) rotate(0deg);
+    transform: scale(0.35) rotate(0deg);
     animation: deal var(--travel) cubic-bezier(0.4, 0.1, 0.3, 1) var(--delay) forwards;
   }
   @keyframes deal {
@@ -121,7 +151,7 @@
       left: var(--from-x);
       top: var(--from-y);
       opacity: 0;
-      transform: scale(0.5) rotate(0deg);
+      transform: scale(0.35) rotate(0deg);
     }
     15% {
       opacity: 1;
@@ -136,8 +166,6 @@
 
   .face-up {
     position: absolute;
-    left: 50%;
-    top: 50%;
     width: 44px;
     height: 60px;
     margin-left: -22px;
