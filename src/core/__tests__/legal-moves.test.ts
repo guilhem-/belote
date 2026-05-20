@@ -119,6 +119,16 @@ describe('legalMoves — partenaire maître + obligation couper', () => {
     const moves = legalMoves(hand, trick, 'H', 'S');
     expect(moves.length).toBe(2); // pas obligé de couper
   });
+
+  it('partenaire maître par coupe → toute la main est jouable (atouts + hors-atout)', () => {
+    // E entame ♦, N (partenaire de S) coupe avec V♥, W défausse ♣, S doit jouer.
+    // S n'a pas ♦. N est maître via la coupe. Règle FFB par défaut : S peut jouer
+    // n'importe quelle carte (toute la main), y compris ses atouts ou hors-atout.
+    const hand = [C('7', 'H'), C('Q', 'H'), C('A', 'C'), C('K', 'S')];
+    const trick = T('E', [P('E', '10', 'D'), P('N', 'J', 'H'), P('W', '7', 'C')]);
+    const moves = legalMoves(hand, trick, 'H', 'S');
+    expect(moves).toEqual(hand);
+  });
 });
 
 describe('legalMoves — option enforceTrumpAfterAnyCut', () => {
