@@ -11,8 +11,12 @@
 
 <div class="scoreboard">
   <div class="team team-ns">
-    <div class="label">NS</div>
-    <div class="score">{match.nsTotal}</div>
+    <span class="label">NS</span>
+    <span class="score">{match.nsTotal}</span>
+  </div>
+  <div class="team team-ew">
+    <span class="label">EO</span>
+    <span class="score">{match.ewTotal}</span>
   </div>
   <div class="meta">
     <div>Donnes : {match.deals.length}</div>
@@ -31,35 +35,32 @@
       </div>
     {/if}
   </div>
-  <div class="team team-ew">
-    <div class="label">EO</div>
-    <div class="score">{match.ewTotal}</div>
-  </div>
 </div>
 
 <style>
   .scoreboard {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 12px 20px;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
     background: rgba(0, 0, 0, 0.4);
     border-radius: 8px;
   }
   .team {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 80px;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
   }
   .label {
-    font-size: 12px;
-    opacity: 0.8;
+    font-size: 13px;
+    opacity: 0.85;
+    font-weight: 600;
   }
   .score {
-    font-size: 32px;
+    font-size: 26px;
     font-weight: 800;
+    line-height: 1;
   }
   .team-ns .score {
     color: #93c5fd;
@@ -69,8 +70,11 @@
   }
   .meta {
     text-align: center;
-    font-size: 13px;
-    opacity: 0.85;
+    font-size: 12px;
+    opacity: 0.8;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 6px;
+    margin-top: 2px;
   }
   .winner {
     margin-top: 4px;

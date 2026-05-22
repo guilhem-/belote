@@ -103,8 +103,10 @@ condition de rendu doit donc inclure `displayedTrick` non nul, sinon l'UI passe 
 ```
 
 ### Hauteur d'écran
-`.screen` a `max-height: 100vh, overflow: hidden`. Tout ajout de contenu doit respecter
-cette contrainte. `.table-grid` est en `flex 1, height 100%`.
+`.screen` a `height/max-height: 100dvh, overflow: hidden`. Tout ajout de contenu doit
+respecter cette contrainte. `.table-grid` est en `flex 1, height 100%`. On utilise
+`100dvh` (et **pas** `100vh`) pour que la zone de jeu ne dépasse pas sous la barre
+d'URL mobile.
 
 ## UI features importantes
 
@@ -115,8 +117,30 @@ cette contrainte. `.table-grid` est en `flex 1, height 100%`.
 - **Disposition pli** : "cross" (géographique) ou "inline" (chronologique), via Settings
 - **Cadence** : `paceMs` pour le pli (défaut 4 s), `bidPaceMs` pour les enchères (défaut 1 s)
 - **Confettis** : déclenchés quand match terminé et équipe gagnante contient un humain
-- **Seed copier/charger** : icônes 📋 / 📥 dans le footer ; seed du *match* (reproductible)
+- **Seed copier/charger** : icônes 📋 / 📥 dans la sidebar gauche ; seed du *match* (reproductible)
 - **Auto-play dernière carte** + **auto-next-deal** : cochés par défaut
+
+## Layout / Responsive
+
+App **paysage uniquement**, y compris sur smartphone. Le portrait étroit affiche un
+overlay « tourne ton appareil ». Le layout est :
+
+- **3 colonnes flex** : `[sidebar gauche] [zone de jeu] [sidebar droite]`
+- **Sidebar gauche** : titre, scoreboard (vertical), bloc seed (copier/charger),
+  donneur, cadence
+- **Sidebar droite** : actions (À propos, Paramètres, Voir pensées IA, Nouvelle partie,
+  Donne suivante) empilées verticalement
+- **Zone de jeu centrale** : `flex: 1`, prend toute la hauteur disponible
+
+Contraintes :
+
+- Hauteur fixée à `100dvh`, jamais `100vh` (cf. piège « Hauteur d'écran »)
+- Pas de mesures absolues dans le code applicatif : tout en flex/grid pour rester
+  responsive aux redimensionnements en live
+- Les animations qui mesurent le DOM (cf. `DealAnimation.svelte`) calculent au
+  montage uniquement — pas de re-mesure à chaque resize, c'est acceptable pour
+  une animation courte
+- Le ReasoningPanel (debug) réserve 400 px à droite via `.screen.with-debug`
 
 ## Déploiement
 

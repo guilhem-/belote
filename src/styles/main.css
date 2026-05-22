@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Taille de référence d'une carte de jeu, utilisée par Card.svelte et DealAnimation.svelte.
+     Toutes les cartes (mains, retourne, animation de distribution) doivent rester
+     dimensionnées à partir de ces variables — modifier ici pour ajuster globalement. */
+  --card-w: 112px;
+  --card-h: 162px;
+  --card-rank-fs: 36px;
+  --card-suit-fs: 46px;
+}
+
 html,
 body {
   height: 100%;

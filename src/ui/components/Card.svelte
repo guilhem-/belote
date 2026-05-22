@@ -46,8 +46,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 92px;
+    width: var(--card-w);
+    height: var(--card-h);
     background: white;
     color: black;
     border: 1.5px solid #1f2937;
@@ -81,10 +81,10 @@
     opacity: 0.45;
   }
   .rank {
-    font-size: 24px;
+    font-size: var(--card-rank-fs);
   }
   .suit {
-    font-size: 30px;
+    font-size: var(--card-suit-fs);
     margin-top: 4px;
   }
 </style>

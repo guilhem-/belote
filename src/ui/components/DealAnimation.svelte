@@ -132,10 +132,11 @@
   }
   .card-back {
     position: absolute;
-    width: 64px;
-    height: 92px;
-    margin-left: -32px;
-    margin-top: -46px;
+    width: var(--card-w);
+    height: var(--card-h);
+    /* Centre la carte sur (--from-x/--to-x, --from-y/--to-y). */
+    margin-left: calc(var(--card-w) / -2);
+    margin-top: calc(var(--card-h) / -2);
     background: linear-gradient(135deg, #1d4ed8 25%, #1e3a8a 75%);
     border: 1.5px solid #1e3a8a;
     border-radius: 6px;
@@ -166,31 +167,33 @@
 
   .face-up {
     position: absolute;
-    width: 44px;
-    height: 60px;
-    margin-left: -22px;
-    margin-top: -30px;
+    width: var(--card-w);
+    height: var(--card-h);
+    margin-left: calc(var(--card-w) / -2);
+    margin-top: calc(var(--card-h) / -2);
     background: white;
-    border: 1.5px solid #fcd34d;
-    border-radius: 5px;
+    border: 1.5px solid #1f2937;
+    border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    font-weight: 800;
+    font-family: 'Times New Roman', serif;
+    font-weight: 700;
+    line-height: 1;
     opacity: 0;
     transform: scale(0.4) rotateY(180deg);
     animation: reveal 500ms ease-out var(--delay) forwards;
   }
   .face-up .rank {
-    font-size: 14px;
+    font-size: var(--card-rank-fs);
     line-height: 1;
   }
   .face-up .suit {
-    font-size: 18px;
+    font-size: var(--card-suit-fs);
     line-height: 1;
+    margin-top: 4px;
   }
   @keyframes reveal {
     0% {

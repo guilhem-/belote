@@ -8,7 +8,6 @@
   import AboutPanel from '../components/AboutPanel.svelte';
   import Confetti from '../components/Confetti.svelte';
   import CoachToast from '../components/CoachToast.svelte';
-  import BeloteAnnounce from '../components/BeloteAnnounce.svelte';
   import ReasoningPanel from '../components/debug/ReasoningPanel.svelte';
   import { SEAT_SHORT as seatShort } from '@i18n/notation';
   import { SEAT_TEAM } from '@core/types';
@@ -100,28 +99,52 @@
 </script>
 
 <div class="screen" class:with-debug={debugStore.visible}>
-  <header class="topbar">
-    <h1>Belote</h1>
+  <aside class="sidebar sidebar-left">
+    <h1 class="title">Belote</h1>
     <Scoreboard match={matchStore.value.match} />
-    <div class="topbar-actions">
-      <button onclick={() => (aboutOpen = true)}>À propos</button>
-      <button onclick={() => (settingsOpen = true)}>Paramètres</button>
-      <button onclick={() => debugStore.toggle()}
-        >{debugStore.visible ? 'Masquer debug' : 'Voir pensées IA'}</button
-      >
-      <button onclick={newMatch}>Nouvelle partie</button>
-      {#if matchStore.value.deal.phase.kind === 'scored' && !matchStore.value.match.finished}
-        <button class="primary" onclick={nextDeal}>Donne suivante</button>
-      {/if}
+    <div class="info-block">
+      <div class="info-row">
+        <span class="info-label">Donneur</span>
+        <span class="info-value">{seatShort[matchStore.value.deal.dealer]}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Cadence</span>
+        <span class="info-value">{(settingsStore.value.paceMs / 1000).toFixed(1)}s</span>
+      </div>
     </div>
-  </header>
+    <div class="seed-block">
+      <span class="seed-label">Seed partie</span>
+      <code class="seed-code">{seedHex()}</code>
+      <div class="seed-actions">
+        <button
+          type="button"
+          class="icon-btn"
+          title="Copier la seed dans le presse-papier"
+          aria-label="Copier la seed"
+          onclick={copySeed}
+        >
+          📋
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          title="Charger une partie depuis la seed dans le presse-papier"
+          aria-label="Charger seed depuis presse-papier"
+          onclick={loadSeedFromClipboard}
+        >
+          📥
+        </button>
+      </div>
+    </div>
+  </aside>
 
-  <main class="main">
+  <main class="play-area">
     <Table
       deal={matchStore.value.deal}
       displayedTrick={matchStore.value.displayedTrick}
       pendingCard={matchStore.value.pendingHumanCard}
       dealingAnimation={matchStore.value.dealingAnimation}
+      beloteBanner={matchStore.value.beloteBanner}
       playRuleOptions={{ enforceTrumpAfterAnyCut: settingsStore.value.enforceTrumpAfterAnyCut }}
       {humanSeats}
       {revealedSeats}
@@ -132,31 +155,17 @@
     />
   </main>
 
-  <footer class="footer">
-    <span class="seed-block">
-      Seed partie : <code>{seedHex()}</code>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Copier la seed dans le presse-papier"
-        aria-label="Copier la seed"
-        onclick={copySeed}
-      >
-        📋
-      </button>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Charger une partie depuis la seed dans le presse-papier"
-        aria-label="Charger seed depuis presse-papier"
-        onclick={loadSeedFromClipboard}
-      >
-        📥
-      </button>
-    </span>
-    <span>Donneur : {seatShort[matchStore.value.deal.dealer]}</span>
-    <span>Cadence : {(settingsStore.value.paceMs / 1000).toFixed(1)}s</span>
-  </footer>
+  <aside class="sidebar sidebar-right">
+    {#if matchStore.value.deal.phase.kind === 'scored' && !matchStore.value.match.finished}
+      <button class="action primary" onclick={nextDeal}>Donne suivante</button>
+    {/if}
+    <button class="action" onclick={newMatch}>Nouvelle partie</button>
+    <button class="action" onclick={() => (settingsOpen = true)}>Paramètres</button>
+    <button class="action" onclick={() => debugStore.toggle()}>
+      {debugStore.visible ? 'Masquer debug' : 'Voir pensées IA'}
+    </button>
+    <button class="action" onclick={() => (aboutOpen = true)}>À propos</button>
+  </aside>
 
   {#if seedToast}
     <div class="toast" role="status">{seedToast}</div>
@@ -164,7 +173,6 @@
 
   <Confetti active={humanWon} />
   <CoachToast />
-  <BeloteAnnounce banner={matchStore.value.beloteBanner} />
 
   <ReasoningPanel />
   {#if settingsOpen}
@@ -175,95 +183,139 @@
   {/if}
 </div>
 
+<div class="portrait-warning" role="alert">
+  <div class="portrait-icon">📱↻</div>
+  <p>Tourne ton appareil en mode paysage pour jouer.</p>
+</div>
+
 <style>
   .screen {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 8px 12px;
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-height: 100vh;
-    max-height: 100vh;
+    flex-direction: row;
+    height: 100dvh;
+    max-height: 100dvh;
     overflow: hidden;
+    gap: 8px;
+    padding: 8px;
     transition: padding-right 200ms ease;
   }
   .screen.with-debug {
-    max-width: none;
-    margin: 0;
-    padding-right: 400px;
+    padding-right: 388px;
   }
-  .main {
-    flex: 1;
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: clamp(160px, 18vw, 240px);
+    flex-shrink: 0;
     min-height: 0;
-    overflow: hidden;
-    display: flex;
+    overflow-y: auto;
   }
-  .main > :global(.table-grid) {
-    flex: 1;
-  }
-  .topbar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .topbar h1 {
-    font-size: 24px;
+
+  .title {
+    font-size: 22px;
     font-weight: 800;
+    text-align: center;
+    margin: 0;
+    letter-spacing: 0.5px;
   }
-  .topbar-actions {
-    margin-left: auto;
+
+  .info-block {
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .topbar-actions button {
-    background: #1f2937;
-    color: white;
-    border: 1px solid #4b5563;
-    padding: 8px 14px;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    opacity: 0.9;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 6px;
-    cursor: pointer;
   }
-  .topbar-actions button.primary {
-    background: #f59e0b;
-    color: black;
-    border-color: #f59e0b;
-  }
-  .footer {
+  .info-row {
     display: flex;
     justify-content: space-between;
-    font-size: 12px;
-    opacity: 0.85;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
+    align-items: baseline;
   }
+  .info-label {
+    opacity: 0.75;
+  }
+  .info-value {
+    font-weight: 600;
+  }
+
   .seed-block {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
   }
-  .seed-block code {
-    background: rgba(255, 255, 255, 0.1);
+  .seed-label {
+    opacity: 0.75;
+  }
+  .seed-code {
+    font-family: ui-monospace, monospace;
+    background: rgba(255, 255, 255, 0.08);
     padding: 2px 6px;
     border-radius: 3px;
-    font-family: ui-monospace, monospace;
+    word-break: break-all;
+  }
+  .seed-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
   }
   .icon-btn {
     background: transparent;
     border: 1px solid #4b5563;
     color: white;
-    padding: 2px 6px;
+    padding: 4px 8px;
     border-radius: 4px;
     cursor: pointer;
-    line-height: 1;
     font-size: 14px;
+    line-height: 1;
+    flex: 1;
   }
   .icon-btn:hover {
     background: rgba(255, 255, 255, 0.1);
   }
+
+  .action {
+    background: #1f2937;
+    color: white;
+    border: 1px solid #4b5563;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    text-align: center;
+    font-weight: 500;
+  }
+  .action:hover {
+    background: #374151;
+  }
+  .action.primary {
+    background: #f59e0b;
+    color: black;
+    border-color: #f59e0b;
+    font-weight: 700;
+  }
+  .action.primary:hover {
+    background: #fbbf24;
+  }
+
+  .play-area {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+  }
+  .play-area > :global(.table-grid) {
+    flex: 1;
+  }
+
   .toast {
     position: fixed;
     bottom: 16px;
@@ -276,5 +328,39 @@
     font-size: 13px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     z-index: 200;
+  }
+
+  .portrait-warning {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #08502b;
+    color: white;
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    font-size: 18px;
+    gap: 16px;
+  }
+  .portrait-icon {
+    font-size: 64px;
+    animation: rotate-hint 2s ease-in-out infinite;
+  }
+  @keyframes rotate-hint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+  }
+
+  /* Smartphones tenus en portrait : on demande de tourner l'écran. */
+  @media (orientation: portrait) and (max-width: 768px) {
+    .screen {
+      display: none;
+    }
+    .portrait-warning {
+      display: flex;
+    }
   }
 </style>

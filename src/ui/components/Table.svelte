@@ -8,6 +8,7 @@
   import BidPanel from './BidPanel.svelte';
   import TricksRecap from './TricksRecap.svelte';
   import DealAnimation from './DealAnimation.svelte';
+  import BeloteAnnounce from './BeloteAnnounce.svelte';
 
   interface Props {
     deal: DealState;
@@ -23,6 +24,8 @@
     pendingCard?: { seat: Seat; card: Card } | null;
     /** Si vrai, masque le contenu central et lance l'animation de distribution. */
     dealingAnimation?: boolean;
+    /** Bannière Belote/Rebelote affichée à côté du badge du siège qui annonce. */
+    beloteBanner?: { kind: 'belote' | 'rebelote'; seat: Seat } | null;
     /** Variantes de règles pour le calcul des coups légaux. */
     playRuleOptions?: LegalMovesOpts;
     onBid: (seat: Seat, bid: Bid) => void;
@@ -38,6 +41,7 @@
     trickLayout = 'cross',
     pendingCard = null,
     dealingAnimation = false,
+    beloteBanner = null,
     playRuleOptions,
     onBid,
     onPlay,
@@ -80,7 +84,12 @@
     <DealAnimation dealer={deal.dealer} faceUp={deal.faceUp} />
   {/if}
   <div class="seat seat-N" class:active={isActing('N')}>
-    <div class="badge">{SEAT_SHORT.N}</div>
+    <div class="badge-row">
+      <div class="badge">{SEAT_SHORT.N}</div>
+      {#if beloteBanner && beloteBanner.seat === 'N'}
+        <BeloteAnnounce kind={beloteBanner.kind} />
+      {/if}
+    </div>
     {#if isActing('N')}<div class="active-marker top">▼</div>{/if}
     <Hand
       cards={deal.hands.N}
@@ -96,7 +105,12 @@
     />
   </div>
   <div class="seat seat-W" class:active={isActing('W')}>
-    <div class="badge">{SEAT_SHORT.W}</div>
+    <div class="badge-row">
+      <div class="badge">{SEAT_SHORT.W}</div>
+      {#if beloteBanner && beloteBanner.seat === 'W'}
+        <BeloteAnnounce kind={beloteBanner.kind} />
+      {/if}
+    </div>
     {#if isActing('W')}<div class="active-marker right">▶</div>{/if}
     <Hand
       cards={deal.hands.W}
@@ -152,7 +166,12 @@
   </div>
 
   <div class="seat seat-E" class:active={isActing('E')}>
-    <div class="badge">{SEAT_SHORT.E}</div>
+    <div class="badge-row">
+      <div class="badge">{SEAT_SHORT.E}</div>
+      {#if beloteBanner && beloteBanner.seat === 'E'}
+        <BeloteAnnounce kind={beloteBanner.kind} />
+      {/if}
+    </div>
     {#if isActing('E')}<div class="active-marker left">◀</div>{/if}
     <Hand
       cards={deal.hands.E}
@@ -168,7 +187,12 @@
     />
   </div>
   <div class="seat seat-S" class:active={isActing('S')}>
-    <div class="badge">{SEAT_SHORT.S}</div>
+    <div class="badge-row">
+      <div class="badge">{SEAT_SHORT.S}</div>
+      {#if beloteBanner && beloteBanner.seat === 'S'}
+        <BeloteAnnounce kind={beloteBanner.kind} />
+      {/if}
+    </div>
     {#if isActing('S')}<div class="active-marker bottom">▲</div>{/if}
     <Hand
       cards={deal.hands.S}
@@ -234,6 +258,11 @@
     gap: 8px;
     align-items: center;
     justify-content: center;
+  }
+  .badge-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   .badge {
     background: rgba(0, 0, 0, 0.35);
